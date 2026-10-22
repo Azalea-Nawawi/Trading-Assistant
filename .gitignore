@@ -1,0 +1,30 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Logs & data
+logs/
+*.log
+*.csv
+*.sqlite3
+*.db
+*.db-wal
+*.db-shm
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+# Kalender berita resmi (D-050) wajib masuk repo
+!data/calendar/*.csv
+
+# Rekaman spread demo (scripts/spread_monitor.py, D-053)
+data/spread/

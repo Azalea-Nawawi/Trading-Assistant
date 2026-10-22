@@ -1,0 +1,13 @@
+# Koneksi dan order broker (D-041, D-043, D-044). Tanpa rahasia: kredensial
+# hanya di .env (MT5_LOGIN, MT5_PASSWORD, MT5_SERVER).
+
+symbol = "XAUUSDm"          # D-027
+server_timezone = "UTC"     # zona IANA server Exness (D-025, D-027)
+allow_live = false          # akun bukan demo ditolak saat connect
+
+# Order (broker v2, D-044)
+magic = 260044              # penanda order milik bot (beda dari magic smoke test B)
+deviation = 20              # points, order market
+market_filling = "IOC"      # terbukti di smoke test B (D-043)
+pending_filling = "RETURN"  # terbukti di smoke test B (D-043)
+max_comment_length = 24     # 31+ ditolak broker (D-043)

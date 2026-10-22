@@ -1,0 +1,3 @@
+# Khusus Windows (terminal MT5 desktop, D-005, D-028).
+MetaTrader5
+tzdata
