@@ -7,7 +7,7 @@
 ## Status Terakhir
 
 **Tanggal:** 2026-10-23  
-**Status overall:** 🟡 PARTIAL — semua bug CRITICAL dari audit sudah diperbaiki (kecuali BUG-002); WARNING masih open
+**Status overall:** 🟡 PARTIAL — semua bug CRITICAL dan WARNING dari audit sudah diperbaiki; BUG-002 dan INFO masih open
 
 ---
 
@@ -109,28 +109,36 @@
 ### 🟡 WARNING
 
 **BUG-008 — M30 tidak punya status UNCLEAR; swing kurang → DATA_INVALID**  
+✅ **FIXED** — `7191ccc` (2026-10-23)  
 `src/analysis/m30_structure.py:27-33, 196-199`; `src/assistant/planner.py:284` (set status M30 tanpa UNCLEAR). Pasar tanpa 2 swing high + 2 swing low dilaporkan `DATA_INVALID` untuk seluruh siklus, padahal spek: UNCLEAR → STANDBY. Tabel konflik M30 vs M15 (DEC-008) sendiri sudah benar di `planner.py:348-368`.
 
 **BUG-009 — Candle "tertutup" hanya berdasarkan posisi, tanpa validasi timestamp**  
+✅ **FIXED** — `52164a0` (2026-10-23)  
 `src/broker/client.py:206-207` membuang baris terakhir begitu saja. DEC-009 mewajibkan validasi timestamp. Tidak ada cek kesegaran data (weekend / feed macet / koneksi putus) di runner langkah 1 → analisis bisa jalan di atas data basi dan tetap menghasilkan VALID. Modul analysis tidak memvalidasi penutupan sendiri (bergantung penuh pada broker).
 
 **BUG-010 — Kalender news habis 2026-12-23 → setelah itu selalu CLEAR**  
+✅ **FIXED** — `65cc8fa` (2026-10-23)  
 `src/filters/news.py:206-214`; `data/calendar/usd_high_impact.csv` (baris terakhir 2026-12-23). Jika `now` melewati cakupan kalender, hasilnya `CLEAR` dengan `next_event=None`. Seharusnya `NEWS_UNKNOWN` (semangat DEC-003). Bom waktu ±2 bulan lagi.
 
 **BUG-011 — Harga terkini H1 = close candle H1 tertutup terakhir**  
+✅ **FIXED** — `e03ed2b` (2026-10-23)  
 `src/analysis/h1_sr.py:168`. Bisa basi hingga ~60 menit; pembagian support/resistance dan pemilihan zona terdekat memakai harga itu.
 
 **BUG-012 — ATR M5 ikut menghitung candle rejection itu sendiri**  
-`src/analysis/m5_rejection.py:138-142, 399-411`. Filter `range ≥ 0.8 × ATR(14)` bersifat self-referential (range candle ikut menaikkan ATR). Perlu keputusan: ATR dari 14 candle sebelum candle sinyal atau termasuk.
+✅ **FIXED** — `127fafa` (2026-10-23)  
+`src/analysis/m5_rejection.py:138-142, 399-411`. Filter `range ≥ 0.8 × ATR(14)` bersifat self-referential (range candle ikut menaikkan ATR). Perlu keputusan: ATR dari 14 candle sebelum candle sinyal atau termasuk.  
+**Keputusan (2026-10-23):** ATR dari 14 candle **sebelum** candle sinyal. M5 sekarang butuh minimal 16 candle; runner mengambil 20.
 
 **BUG-013 — Broker client masih punya fungsi eksekusi order**  
+✅ **FIXED** — `b0f2394` (2026-10-23)  
 `src/broker/client.py:303-477` (`_order_send`, `close_position`, `modify_sltp`, `cancel_order`). Tidak dipanggil runner, tapi bertentangan dengan DEC-001 (BOT hanya analisis). Sebaiknya dihapus/diisolasi.
 
 **BUG-014 — Tidak ada test untuk logika inti; pytest tidak terpasang**  
-🟡 PARTIAL — pytest terpasang; test untuk planner, runner, H1 S/R, dan M5 sudah ada. M30, M15, dan news filter masih belum.  
+✅ **FIXED** — `d3acbaa` + `65cc8fa` (2026-10-23): test untuk semua modul analysis, planner, runner, dan news filter.  
 Tidak ada test untuk `h1_sr`, `m30_structure`, `m15_bias`, `m5_rejection`, `planner`, `runner`, `filters/news.py` (test_news_calendar hanya cek integritas CSV). `python -m pytest` gagal: modul pytest tidak terpasang di Python 3.12 lokal → aturan "jangan commit jika test gagal" tidak bisa diverifikasi.
 
 **BUG-015 — EMA50 M15 belum konvergen**  
+✅ **FIXED** — `e1f46b5` (2026-10-23)  
 `src/assistant/runner.py:48` (M15 = 60 candle), `src/analysis/m15_bias.py:24, 78`. Seed SMA 50 candle + hanya 10 iterasi → nilai EMA50 berbeda signifikan dari EMA di MT5. Kondisi BULLISH/BEARISH/NEUTRAL sendiri sudah benar.
 
 ### 🔵 INFO
@@ -159,7 +167,8 @@ Tidak ada test untuk `h1_sr`, `m30_structure`, `m15_bias`, `m5_rejection`, `plan
 
 - [ ] Fix BUG-002 — symbol mapping
 - [x] Fix BUG-001, BUG-003 s/d BUG-007 (TDD, satu commit per bug)
-- [ ] Fix WARNING BUG-008 s/d BUG-015
+- [x] Fix WARNING BUG-008 s/d BUG-015 (TDD, satu commit per bug)
+- [ ] Catat keputusan BUG-007 (SL di luar Entry Zone) dan BUG-012 (ATR tanpa candle sinyal) sebagai DEC baru di DECISIONS.md
 - [ ] Validasi output laporan Telegram
 - [ ] Forward test demo — minimal 2 minggu
 - [ ] `CLAUDE.md`, `CHECKPOINT.md`, `DECISIONS.md` di repo ← sedang dibuat
@@ -171,5 +180,8 @@ Tidak ada test untuk `h1_sr`, `m30_structure`, `m15_bias`, `m5_rejection`, `plan
 - Bot sudah bisa connect ke MT5 dan disconnect dengan benar
 - Output console dan Telegram sudah jalan
 - BUG-001 fixed: bot sekarang bisa menghasilkan `VALID`
-- pytest terpasang (`pip install -r requirements-dev.txt`); test baru: `test_planner.py`, `test_runner.py`, `test_h1_sr.py`, `test_m5_rejection.py` — 163 passed
+- pytest terpasang (`pip install -r requirements-dev.txt`); test untuk planner, runner, H1, M30, M15, M5, news filter — 178 passed
+- Jumlah candle runner: H1 60, M30 50, M15 250, M5 20
+- Data basi (candle terbaru tiap TF lebih tua dari 1 slot) → `DATA_INVALID`; artinya saat market tutup (weekend, jeda harian) bot memang keluar `DATA_INVALID`
+- Kalender news harus diperbarui sebelum 2026-12-23, setelah itu filter news keluar `NEWS_UNKNOWN` → STANDBY
 - Planner sekarang butuh `current_price` (runner pakai `broker.tick().bid`); hasil M5 sekarang punya field `atr`
