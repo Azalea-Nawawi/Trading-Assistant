@@ -380,6 +380,19 @@ def build_trade_plan(
             macro,
         )
 
+    if m5.get("status") != "VALID":
+        return _base_result(
+            "STANDBY",
+            "M5 rejection or trade-plan validation did not pass.",
+            h1,
+            m30,
+            m15,
+            m5,
+            news,
+            geopolitics,
+            macro,
+        )
+
     plan, plan_error = _extract_trade_plan(m5)
     if plan_error is not None or plan is None:
         status = "DATA_INVALID" if m5.get("status") == "VALID" else "STANDBY"
