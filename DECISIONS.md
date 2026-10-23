@@ -135,6 +135,19 @@ Akibatnya M5 butuh minimal 16 candle tertutup (15 untuk ATR + 1 candle sinyal); 
 
 ---
 
+## DEC-012 — Roadmap Arsitektur Bot
+
+**Tanggal:** 2026-10-23  
+**Keputusan:**
+- **v1.0 (sekarang): Python + MT5 + logika deterministik — AKTIF**
+- **v2.0:** tambah Anthropic API (Sonnet 5.5) sebagai reasoning layer — reasoning sinyal, confidence scoring, market narrative
+- **v3.0:** TradingView webhook + Cloudflare Tunnel + Windows VPS — analisa candle via Pine Script, webhook ke Python bot
+
+**Alasan:** Validasi strategi dulu via v1.0 sebelum menambah kompleksitas. API dan TradingView baru masuk setelah logika Python terbukti akurat.  
+**Implikasi kode:** Tidak ada perubahan kode untuk sekarang.
+
+---
+
 ## Template Keputusan Baru
 
 ```

@@ -185,3 +185,4 @@ Tidak ada test untuk `h1_sr`, `m30_structure`, `m15_bias`, `m5_rejection`, `plan
 - Data basi (candle terbaru tiap TF lebih tua dari 1 slot) → `DATA_INVALID`; artinya saat market tutup (weekend, jeda harian) bot memang keluar `DATA_INVALID`
 - Kalender news harus diperbarui sebelum 2026-12-23, setelah itu filter news keluar `NEWS_UNKNOWN` → STANDBY
 - Planner sekarang butuh `current_price` (runner pakai `broker.tick().bid`); hasil M5 sekarang punya field `atr`
+- Roadmap arsitektur dicatat di DEC-012 (2026-10-23): v1.0 Python + MT5 deterministik (AKTIF) → v2.0 Anthropic API (Sonnet 5.5) sebagai reasoning layer → v3.0 TradingView webhook + Cloudflare Tunnel + Windows VPS. v2.0/v3.0 baru dikerjakan setelah v1.0 terbukti akurat; belum ada perubahan kode.
