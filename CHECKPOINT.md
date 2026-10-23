@@ -7,7 +7,7 @@
 ## Status Terakhir
 
 **Tanggal:** 2026-10-23  
-**Status overall:** 🟢 BUG-001 dan BUG-002 FIXED — evaluation chain v1.0 sudah aktif sesuai keputusan
+**Status overall:** 🟢 BUG-001/BUG-002 FIXED — evaluation chain dan output v1.0 sudah bersih
 
 ---
 
@@ -68,7 +68,7 @@
 **Status:** ✅ FIXED  
 **Gejala:** Bot return `STANDBY` dengan alasan `GEO_UNKNOWN` padahal geopolitics NONAKTIF di v1.0  
 **Lokasi:** `src/assistant/runner.py` dan `src/assistant/planner.py`  
-**Fix:** Geopolitics dan Macro tidak dipanggil serta hanya disimpan sebagai snapshot `INACTIVE`; keduanya tidak menjadi gate status.  
+**Fix:** Geopolitics dan Macro dihapus dari pemanggilan, parameter planner, evaluation chain, snapshot, dan output.  
 
 ### BUG-002 — Simbol salah
 **Status:** ✅ FIXED  
@@ -90,5 +90,6 @@
 
 - Bot sudah bisa connect ke MT5 dan disconnect dengan benar
 - Output console dan Telegram sudah jalan
-- Runner tidak lagi memanggil geopolitics/macro; output menggunakan status `INACTIVE`
+- Runner dan planner hanya mengevaluasi serta menampilkan filter News
+- Output tidak lagi menampilkan geopolitics/macro atau `GEO_UNKNOWN`/`MACRO_UNKNOWN`
 - Symbol dari `--symbol` diteruskan konsisten sampai `MT5Broker`
