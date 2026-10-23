@@ -7,7 +7,7 @@
 ## Status Terakhir
 
 **Tanggal:** 2026-10-23  
-**Status overall:** 🟡 PARTIAL — bot jalan tapi ada bug kritis
+**Status overall:** 🟢 BUG-001 dan BUG-002 FIXED — evaluation chain v1.0 sudah aktif sesuai keputusan
 
 ---
 
@@ -65,26 +65,24 @@
 ## Bug Kritis — Harus Diselesaikan
 
 ### BUG-001 — Geopolitics filter aktif di evaluation chain
-**Status:** 🔴 OPEN  
+**Status:** ✅ FIXED  
 **Gejala:** Bot return `STANDBY` dengan alasan `GEO_UNKNOWN` padahal geopolitics NONAKTIF di v1.0  
-**Lokasi:** `src/assistant/runner.py` — geopolitics filter masuk ke chain evaluasi  
-**Fix:** Hapus/bypass geopolitics dari evaluation chain di runner.py  
+**Lokasi:** `src/assistant/runner.py` dan `src/assistant/planner.py`  
+**Fix:** Geopolitics dan Macro tidak dipanggil serta hanya disimpan sebagai snapshot `INACTIVE`; keduanya tidak menjadi gate status.  
 
 ### BUG-002 — Simbol salah
-**Status:** 🔴 OPEN  
+**Status:** ✅ FIXED  
 **Gejala:** Run dengan `--symbol XAUUSD` tapi connect ke `XAUUSDm`  
-**Lokasi:** `config/broker.toml` atau `src/broker/config.py`  
-**Fix:** Pastikan symbol mapping benar sesuai broker aktif  
+**Lokasi:** `src/assistant/runner.py` dan `src/broker/config.py`  
+**Fix:** Symbol CLI diteruskan sebagai override tervalidasi ke BrokerConfig; koneksi menggunakan symbol yang diminta.  
 
 ---
 
 ## Yang Belum Dikerjakan
 
-- [ ] Fix BUG-001 — hapus geopolitics dari runner evaluation chain
-- [ ] Fix BUG-002 — symbol mapping
 - [ ] Validasi output laporan Telegram
 - [ ] Forward test demo — minimal 2 minggu
-- [ ] `CLAUDE.md`, `CHECKPOINT.md`, `DECISIONS.md` di repo ← sedang dibuat
+- [x] `CLAUDE.md`, `CHECKPOINT.md`, `DECISIONS.md` di repo
 
 ---
 
@@ -92,4 +90,5 @@
 
 - Bot sudah bisa connect ke MT5 dan disconnect dengan benar
 - Output console dan Telegram sudah jalan
-- Evaluasi status belum akurat karena BUG-001
+- Runner tidak lagi memanggil geopolitics/macro; output menggunakan status `INACTIVE`
+- Symbol dari `--symbol` diteruskan konsisten sampai `MT5Broker`
