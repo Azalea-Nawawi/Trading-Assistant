@@ -44,3 +44,11 @@ def test_sl_structure_lies_beyond_entry_zone_not_on_entry_level():
     assert result["entry_zone"]["low"] > 1995.0
     # M5 swing 1995.0 minus the 0.40 buffer, not H1 entry level 1997.5 minus buffer.
     assert result["sl_structure"] == pytest.approx(1994.6)
+
+
+def test_structural_risk_above_1_5x_risk_atr_is_standby():
+    # Swing 1993.0 -> risk 4.9 vs Risk_ATR ~3.09: 1.59x, inside the old 2.0x limit.
+    result = bullish_pin_setup(m5_swing_low=1993.0)
+    assert result["risk_struct"] > 1.5 * result["risk_atr"]
+    assert result["status"] == "STANDBY"
+    assert "1.5" in result["reason"]

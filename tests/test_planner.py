@@ -59,3 +59,18 @@ def test_news_unknown_returns_standby():
 
 def test_planner_has_no_geopolitics_or_macro_gate():
     assert not hasattr(planner, "VALID_MACRO_STATUS")
+
+
+def test_structural_risk_above_1_5x_risk_atr_is_standby():
+    result = suggest(m5=m5_valid(risk_struct=3.5, risk_atr=2.0))
+    assert result["status"] == "STANDBY"
+
+
+def test_structural_risk_exactly_1_5x_risk_atr_passes():
+    result = suggest(m5=m5_valid(risk_struct=3.0, risk_atr=2.0))
+    assert result["status"] == "VALID", result["reason"]
+
+
+def test_small_structural_risk_has_no_lower_bound():
+    result = suggest(m5=m5_valid(risk_struct=1.0, risk_atr=2.0))
+    assert result["status"] == "VALID", result["reason"]

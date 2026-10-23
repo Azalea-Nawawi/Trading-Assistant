@@ -3,8 +3,9 @@
 This module implements the Rejection, location, Entry Zone, Stop Loss, and
 Take Profit rules from Spesifikasi Final v1.0. It detects bullish or bearish
 Pin Bars and Engulfing candles, filters candle size with ATR(14), validates
-location near H1 zones or M30 swings, and checks structural risk against
-1.2 times ATR before producing TP1 at 1.5R and TP2 at 2.5R.
+location near H1 zones or M30 swings, and accepts structural risk only when
+Risk_Struct <= 1.5 x Risk_ATR (Risk_ATR = 1.2 x ATR, DEC-007) before producing
+TP1 at 1.5R and TP2 at 2.5R.
 
 Only closed M5 candles ordered from oldest to newest are accepted. The latest
 candle is the rejection candidate and the prior candle is used for engulfing.
@@ -32,8 +33,7 @@ MIN_REJECTION_RANGE_ATR: Final[float] = 0.80
 LOCATION_TOLERANCE_ATR: Final[float] = 0.50
 SL_ATR_MULTIPLIER: Final[float] = 1.20
 SL_BUFFER_USD: Final[float] = 0.40
-MIN_RISK_ATR_MULTIPLIER: Final[float] = 0.80
-MAX_RISK_ATR_MULTIPLIER: Final[float] = 2.00
+MAX_RISK_ATR_MULTIPLIER: Final[float] = 1.50
 TP1_R_MULTIPLIER: Final[float] = 1.50
 TP2_R_MULTIPLIER: Final[float] = 2.50
 
@@ -331,11 +331,8 @@ def _build_valid_plan(
 
     risk_struct = abs(entry - sl_structure)
     risk_atr = SL_ATR_MULTIPLIER * atr
-    minimum_risk = MIN_RISK_ATR_MULTIPLIER * risk_atr
-    maximum_risk = MAX_RISK_ATR_MULTIPLIER * risk_atr
-
-    # Structural risk must stay between 0.8R_ATR and 2.0R_ATR.
-    if not minimum_risk <= risk_struct <= maximum_risk:
+    # DEC-007: structure leads, ATR only caps it at 1.5 x Risk_ATR.
+    if risk_struct > MAX_RISK_ATR_MULTIPLIER * risk_atr:
         return None
 
     if direction == "BULLISH":
@@ -523,7 +520,7 @@ def calculate_m5_rejection(
         risk_struct = abs(entry_price - sl_structure)
         return _empty_result(
             "STANDBY",
-            f"{shape_reason} Structural risk is outside the {MIN_RISK_ATR_MULTIPLIER:.2f}-{MAX_RISK_ATR_MULTIPLIER:.2f} ATR risk range.",
+            f"{shape_reason} SL terlalu jauh: structural risk exceeds {MAX_RISK_ATR_MULTIPLIER:.1f} x Risk_ATR.",
             rejection_valid=rejection_valid,
             rejection_type=rejection_type,
             direction=direction,

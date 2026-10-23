@@ -3,7 +3,7 @@
 This module combines H1, M30, M15, and M5 analysis results with the News
 filter result according to Spesifikasi Final v1.0. The mandatory decision
 order is: validate data, News, aligned M15/M30 bias, valid M5 rejection and
-location, then structural-risk validation between 0.8x and 2.0x ATR. Only when
+location, then structural-risk validation (Risk_Struct <= 1.5x Risk_ATR). Only when
 every gate passes is the final status VALID; otherwise the result is STANDBY,
 except incomplete or invalid module results which produce DATA_INVALID.
 Geopolitics and Macro filters are inactive in v1.0 (DEC-002).
@@ -20,8 +20,7 @@ from math import isfinite
 from typing import Final, Literal, Sequence, TypedDict
 
 
-MIN_RISK_ATR_MULTIPLIER: Final[float] = 0.80
-MAX_RISK_ATR_MULTIPLIER: Final[float] = 2.00
+MAX_RISK_ATR_MULTIPLIER: Final[float] = 1.50
 VALID_H1_STATUS: Final[str] = "OK"
 TRADER_WARNING: Final[str] = "Keputusan transaksi tetap di tangan trader."
 
@@ -379,14 +378,11 @@ def build_trade_plan(
             news,
         )
 
-    minimum_risk = MIN_RISK_ATR_MULTIPLIER * risk_atr
-    maximum_risk = MAX_RISK_ATR_MULTIPLIER * risk_atr
-
-    # Re-check the final ATR risk gate before allowing VALID status.
-    if not minimum_risk <= risk_struct <= maximum_risk:
+    # Re-check the final ATR risk gate before allowing VALID status (DEC-007).
+    if risk_struct > MAX_RISK_ATR_MULTIPLIER * risk_atr:
         return _base_result(
             "STANDBY",
-            "M5 structural risk is outside the 0.8x-2.0x ATR range.",
+            "SL terlalu jauh: M5 structural risk exceeds 1.5x Risk_ATR.",
             h1,
             m30,
             m15,
