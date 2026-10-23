@@ -204,6 +204,13 @@ def check_news_filter(
         }
 
     next_event = _next_future_event(events, now_utc)
+
+    # Past the last listed event the calendar no longer covers now (DEC-003).
+    if next_event is None:
+        return _unknown_result(
+            "News calendar has no future events; coverage has ended and must be updated."
+        )
+
     return {
         "status": "CLEAR",
         "next_event": _event_output(next_event, now_utc) if next_event else None,
