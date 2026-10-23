@@ -143,12 +143,18 @@ def _emit_summary(result: PlannerResult) -> None:
         log.exception("runner: unable to print summary")
 
 
-def run_once(symbol: str = DEFAULT_SYMBOL) -> dict[str, object]:
+def run_once(
+    symbol: str = DEFAULT_SYMBOL,
+    *,
+    emit: bool = True,
+) -> dict[str, object]:
     """Run one complete semi-auto analysis cycle.
 
     Args:
         symbol: MT5 symbol to analyze. It defaults to XAUUSDm and overrides the
             non-secret symbol value loaded from config/broker.toml.
+        emit: Whether to print summary_text as a notifier fallback. Defaults to
+            True; CLI callers can set it to False to format the result themselves.
 
     Returns:
         A planner result containing analysis snapshots, filter snapshots,
@@ -162,7 +168,8 @@ def run_once(symbol: str = DEFAULT_SYMBOL) -> dict[str, object]:
 
     if not isinstance(symbol, str) or not symbol.strip():
         result = _invalid_result("Symbol must be a non-empty string.")
-        _emit_summary(result)
+        if emit:
+            _emit_summary(result)
         return dict(result)
 
     broker: MT5Broker | None = None
@@ -188,7 +195,8 @@ def run_once(symbol: str = DEFAULT_SYMBOL) -> dict[str, object]:
             except Exception:
                 log.exception("runner: broker disconnect failed")
 
-    _emit_summary(result)
+    if emit:
+        _emit_summary(result)
     return dict(result)
 
 
