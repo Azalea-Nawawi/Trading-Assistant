@@ -467,9 +467,46 @@ def build_trade_plan(
     )
 
 
+def build_suggestion(
+    h1: Mapping[str, object],
+    m30: Mapping[str, object],
+    m15: Mapping[str, object],
+    m5: Mapping[str, object],
+    news: Mapping[str, object],
+    geopolitics: Mapping[str, object],
+    macro: Mapping[str, object],
+) -> PlannerResult:
+    """Build the final suggestion using the planner's canonical decision flow.
+
+    Args:
+        h1: Result from the H1 support/resistance analysis.
+        m30: Result from the M30 market-structure analysis.
+        m15: Result from the M15 EMA-bias analysis.
+        m5: Result from the M5 rejection and trade-plan analysis.
+        news: Result from the economic high-impact news filter.
+        geopolitics: Result from the geopolitical keyword filter.
+        macro: Placeholder macro-filter result.
+
+    Returns:
+        The same validated recommendation mapping returned by
+        build_trade_plan.
+    """
+
+    return build_trade_plan(
+        h1=h1,
+        m30=m30,
+        m15=m15,
+        m5=m5,
+        news=news,
+        geopolitics=geopolitics,
+        macro=macro,
+    )
+
+
 __all__ = [
     "EntryZone",
     "PlannerResult",
     "TradePlan",
+    "build_suggestion",
     "build_trade_plan",
 ]
