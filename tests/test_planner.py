@@ -37,6 +37,7 @@ def suggest(**overrides):
         "m15": M15_BULL,
         "m5": m5_valid(),
         "news": NEWS_CLEAR,
+        "current_price": 2000.0,
     }
     kwargs.update(overrides)
     return build_suggestion(**kwargs)
@@ -74,3 +75,35 @@ def test_structural_risk_exactly_1_5x_risk_atr_passes():
 def test_small_structural_risk_has_no_lower_bound():
     result = suggest(m5=m5_valid(risk_struct=1.0, risk_atr=2.0))
     assert result["status"] == "VALID", result["reason"]
+
+
+# --- DEC-006: Entry Zone 1999-2001, ATR M5 2.0 -> expiry beyond 1.0 x ATR from the zone edge.
+
+
+def test_price_more_than_1_atr_above_zone_is_standby():
+    result = suggest(current_price=2003.5)
+    assert result["status"] == "STANDBY"
+    assert "meninggalkan Entry Zone" in result["reason"]
+    assert result["plan"] is None
+
+
+def test_price_more_than_1_atr_below_zone_is_standby():
+    result = suggest(current_price=1996.5)
+    assert result["status"] == "STANDBY"
+    assert "meninggalkan Entry Zone" in result["reason"]
+
+
+def test_price_exactly_1_atr_from_zone_is_still_valid():
+    result = suggest(current_price=2003.0)
+    assert result["status"] == "VALID", result["reason"]
+
+
+def test_missing_current_price_is_data_invalid():
+    result = suggest(current_price=None)
+    assert result["status"] == "DATA_INVALID"
+
+
+def test_missing_m5_atr_is_data_invalid():
+    m5 = m5_valid()
+    del m5["atr"]
+    assert suggest(m5=m5)["status"] == "DATA_INVALID"

@@ -28,6 +28,8 @@ def test_analysis_cycle_reaches_valid_with_only_news_filter(monkeypatch):
     monkeypatch.setattr(runner, "check_news_filter", lambda now, path: NEWS_CLEAR)
 
     candles = {timeframe: [] for timeframe in Timeframe}
-    result = runner._analyse_and_filter(candles, datetime(2026, 10, 23, tzinfo=timezone.utc))
+    now = datetime(2026, 10, 23, tzinfo=timezone.utc)
 
-    assert result["status"] == "VALID", result["reason"]
+    assert runner._analyse_and_filter(candles, now, 2000.0)["status"] == "VALID"
+    # The live price is passed through to the Entry Zone expiry check (DEC-006).
+    assert runner._analyse_and_filter(candles, now, 2010.0)["status"] == "STANDBY"

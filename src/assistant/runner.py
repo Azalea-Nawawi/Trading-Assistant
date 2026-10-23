@@ -82,12 +82,14 @@ def _invalid_result(reason: str) -> PlannerResult:
         m15=invalid_analysis,
         m5=invalid_analysis,
         news=unknown_filter,
+        current_price=None,
     )
 
 
 def _analyse_and_filter(
     candles: dict[Timeframe, list],
     now_utc: datetime,
+    current_price: float,
 ) -> PlannerResult:
     """Run all analysis and filter modules, then pass their results to planner."""
 
@@ -118,6 +120,7 @@ def _analyse_and_filter(
         m15=m15,
         m5=m5,
         news=news,
+        current_price=current_price,
     )
 
 
@@ -167,9 +170,11 @@ def run_once(
         broker = _load_broker(symbol)
         broker.connect()
         candles = _collect_candles(broker)
+        # Bid matches the candle price basis; used for Entry Zone expiry (DEC-006).
+        current_price = broker.tick().bid
 
         # Run analysis, filters, and the final planner in one deterministic cycle.
-        result = _analyse_and_filter(candles, now_utc)
+        result = _analyse_and_filter(candles, now_utc, current_price)
     except Exception as error:
         log.exception("runner: analysis cycle failed: %s", error)
         result = _invalid_result(

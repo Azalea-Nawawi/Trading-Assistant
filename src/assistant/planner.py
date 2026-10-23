@@ -3,9 +3,11 @@
 This module combines H1, M30, M15, and M5 analysis results with the News
 filter result according to Spesifikasi Final v1.0. The mandatory decision
 order is: validate data, News, aligned M15/M30 bias, valid M5 rejection and
-location, then structural-risk validation (Risk_Struct <= 1.5x Risk_ATR). Only when
-every gate passes is the final status VALID; otherwise the result is STANDBY,
-except incomplete or invalid module results which produce DATA_INVALID.
+location, structural-risk validation (Risk_Struct <= 1.5x Risk_ATR), then
+Entry Zone expiry (price more than 1.0x ATR M5 beyond the zone, DEC-006).
+Only when every gate passes is the final status VALID; otherwise the result is
+STANDBY, except incomplete or invalid module results which produce
+DATA_INVALID.
 Geopolitics and Macro filters are inactive in v1.0 (DEC-002).
 
 The planner is pure: it receives already-computed mappings, performs no MT5
@@ -21,6 +23,7 @@ from typing import Final, Literal, Sequence, TypedDict
 
 
 MAX_RISK_ATR_MULTIPLIER: Final[float] = 1.50
+ENTRY_ZONE_EXPIRY_ATR: Final[float] = 1.00
 VALID_H1_STATUS: Final[str] = "OK"
 TRADER_WARNING: Final[str] = "Keputusan transaksi tetap di tangan trader."
 
@@ -216,6 +219,7 @@ def _extract_trade_plan(m5: Mapping[str, object]) -> tuple[TradePlan | None, str
         "tp2",
         "risk_struct",
         "risk_atr",
+        "atr",
     )
     numeric_values: dict[str, float] = {}
     for field in numeric_fields:
@@ -247,6 +251,8 @@ def build_trade_plan(
     m15: Mapping[str, object],
     m5: Mapping[str, object],
     news: Mapping[str, object],
+    *,
+    current_price: float | None,
 ) -> PlannerResult:
     """Combine analysis and filters into one final trading recommendation.
 
@@ -256,6 +262,7 @@ def build_trade_plan(
         m15: Result from the M15 EMA-bias analysis.
         m5: Result from the M5 rejection and trade-plan analysis.
         news: Result from the economic high-impact news filter.
+        current_price: Live market price used to expire a stale Entry Zone.
 
     Returns:
         A nested mapping containing the original analysis/filter snapshots, a
@@ -286,6 +293,18 @@ def build_trade_plan(
                 m5,
                 news,
             )
+
+    price = _as_float(current_price)
+    if price is None or price <= 0:
+        return _base_result(
+            "DATA_INVALID",
+            "Current market price is missing or invalid.",
+            h1,
+            m30,
+            m15,
+            m5,
+            news,
+        )
 
     news_status = str(news["status"])
     if news_status != "CLEAR":
@@ -390,9 +409,23 @@ def build_trade_plan(
             news,
         )
 
+    # DEC-006: a plan is stale once price has left the zone by more than 1 ATR M5.
+    zone = plan["entry_zone"]
+    distance_from_zone = max(zone["low"] - price, price - zone["high"], 0.0)
+    if distance_from_zone > ENTRY_ZONE_EXPIRY_ATR * float(m5["atr"]):
+        return _base_result(
+            "STANDBY",
+            "Harga telah meninggalkan Entry Zone (lebih dari 1.0x ATR M5 dari batas zona).",
+            h1,
+            m30,
+            m15,
+            m5,
+            news,
+        )
+
     return _base_result(
         "VALID",
-        "All data, news, alignment, rejection, location, and ATR-risk gates passed.",
+        "All data, news, alignment, rejection, location, ATR-risk, and Entry Zone gates passed.",
         h1,
         m30,
         m15,
@@ -408,6 +441,8 @@ def build_suggestion(
     m15: Mapping[str, object],
     m5: Mapping[str, object],
     news: Mapping[str, object],
+    *,
+    current_price: float | None,
 ) -> PlannerResult:
     """Build the final suggestion using the planner's canonical decision flow.
 
@@ -417,6 +452,7 @@ def build_suggestion(
         m15: Result from the M15 EMA-bias analysis.
         m5: Result from the M5 rejection and trade-plan analysis.
         news: Result from the economic high-impact news filter.
+        current_price: Live market price used to expire a stale Entry Zone.
 
     Returns:
         The same validated recommendation mapping returned by
@@ -429,6 +465,7 @@ def build_suggestion(
         m15=m15,
         m5=m5,
         news=news,
+        current_price=current_price,
     )
 
 

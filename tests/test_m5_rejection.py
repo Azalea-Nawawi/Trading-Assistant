@@ -52,3 +52,8 @@ def test_structural_risk_above_1_5x_risk_atr_is_standby():
     assert result["risk_struct"] > 1.5 * result["risk_atr"]
     assert result["status"] == "STANDBY"
     assert "1.5" in result["reason"]
+
+
+def test_result_exposes_m5_atr_for_entry_zone_expiry():
+    result = bullish_pin_setup(m5_swing_low=1995.0)
+    assert result["atr"] == pytest.approx(34.0 / 14.0)

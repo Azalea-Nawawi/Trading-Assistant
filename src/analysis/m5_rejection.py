@@ -65,6 +65,7 @@ class M5RejectionResult(TypedDict):
     tp2: float | None
     risk_struct: float | None
     risk_atr: float | None
+    atr: float | None
     status: PlanStatus
     reason: str
 
@@ -80,6 +81,7 @@ def _empty_result(
     entry_zone: EntryZone | None = None,
     risk_struct: float | None = None,
     risk_atr: float | None = None,
+    atr: float | None = None,
 ) -> M5RejectionResult:
     """Build a result while keeping incomplete plans free of forced prices."""
 
@@ -96,6 +98,7 @@ def _empty_result(
         "tp2": None,
         "risk_struct": risk_struct,
         "risk_atr": risk_atr,
+        "atr": atr,
         "status": status,
         "reason": reason,
     }
@@ -406,7 +409,7 @@ def calculate_m5_rejection(
     rejection_type, direction, shape_reason = _detect_rejection_shape(previous, current)
 
     if rejection_type is None or direction is None:
-        return _empty_result("STANDBY", shape_reason)
+        return _empty_result("STANDBY", shape_reason, atr=atr)
 
     candle_range = current.high - current.low
     minimum_range = MIN_REJECTION_RANGE_ATR * atr
@@ -416,6 +419,7 @@ def calculate_m5_rejection(
             f"{shape_reason} Candle range is below {MIN_REJECTION_RANGE_ATR:.2f} ATR.",
             rejection_type=rejection_type,
             direction=direction,
+            atr=atr,
         )
 
     rejection_valid = True
@@ -467,6 +471,7 @@ def calculate_m5_rejection(
             rejection_type=rejection_type,
             direction=direction,
             location_valid=False,
+            atr=atr,
         )
 
     if direction != bias or entry_zone is None:
@@ -477,6 +482,7 @@ def calculate_m5_rejection(
             rejection_type=rejection_type,
             direction=direction,
             location_valid=True,
+            atr=atr,
         )
 
     m5_swing = _confirmed_m5_swing(candles, direction)
@@ -502,6 +508,7 @@ def calculate_m5_rejection(
             location_valid=True,
             entry_zone=entry_zone,
             risk_atr=SL_ATR_MULTIPLIER * atr,
+            atr=atr,
         )
 
     plan = _build_valid_plan(
@@ -528,6 +535,7 @@ def calculate_m5_rejection(
             entry_zone=entry_zone,
             risk_struct=risk_struct,
             risk_atr=risk_atr,
+            atr=atr,
         )
 
     (
@@ -552,6 +560,7 @@ def calculate_m5_rejection(
         "tp2": tp2,
         "risk_struct": risk_struct,
         "risk_atr": risk_atr,
+        "atr": atr,
         "status": "VALID",
         "reason": f"{shape_reason} Location and structural-risk filters passed.",
     }
