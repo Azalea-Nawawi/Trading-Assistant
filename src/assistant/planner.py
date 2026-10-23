@@ -1,18 +1,18 @@
 """Multi-timeframe recommendation planner for Telegram output.
 
-This module combines H1, M30, M15, and M5 analysis results with News,
-Geopolitics, and Macro filter results according to Spesifikasi Final v1.0.
-The mandatory decision order is: validate data, News, Geopolitics, aligned
-M15/M30 bias, valid M5 rejection and location, then structural-risk validation
-between 0.8x and 2.0x ATR. Only when every gate passes is the final status
-VALID; otherwise the result is STANDBY, except incomplete or invalid module
-results which produce DATA_INVALID.
+This module combines H1, M30, M15, and M5 analysis results with the active
+News filter according to Spesifikasi Final v1.0. The mandatory decision order
+is: validate data, News, aligned M15/M30 bias, valid M5 rejection and location,
+then structural-risk validation between 0.8x and 2.0x ATR. Only when every
+active gate passes is the final status VALID; otherwise the result is STANDBY,
+except incomplete or invalid module results which produce DATA_INVALID.
+
+Geopolitics and Macro are inactive in v1.0. Their snapshots are retained only
+for output compatibility and never participate in status evaluation.
 
 The planner is pure: it receives already-computed mappings, performs no MT5
-access and makes no network calls. The Macro result is accepted as a
-placeholder mapping; any status other than CLEAR is handled fail-closed as
-STANDBY. Every Telegram summary includes the warning that the final
-transaction decision remains with the trader.
+access and makes no network calls. Every Telegram summary includes the warning
+that the final transaction decision remains with the trader.
 """
 
 from __future__ import annotations
@@ -25,7 +25,6 @@ from typing import Final, Literal, Sequence, TypedDict
 MIN_RISK_ATR_MULTIPLIER: Final[float] = 0.80
 MAX_RISK_ATR_MULTIPLIER: Final[float] = 2.00
 VALID_H1_STATUS: Final[str] = "OK"
-VALID_MACRO_STATUS: Final[str] = "CLEAR"
 TRADER_WARNING: Final[str] = "Keputusan transaksi tetap di tangan trader."
 
 PlanDirection = Literal["BULLISH", "BEARISH"]
@@ -266,8 +265,8 @@ def build_trade_plan(
         m15: Result from the M15 EMA-bias analysis.
         m5: Result from the M5 rejection and trade-plan analysis.
         news: Result from the economic high-impact news filter.
-        geopolitics: Result from the geopolitical keyword filter.
-        macro: Placeholder macro-filter result with at least a status field.
+        geopolitics: Inactive filter snapshot retained for output compatibility.
+        macro: Inactive filter snapshot retained for output compatibility.
 
     Returns:
         A nested mapping containing the original analysis/filter snapshots, a
@@ -285,8 +284,8 @@ def build_trade_plan(
         ("M15", m15, {"BULLISH", "BEARISH", "NEUTRAL"}),
         ("M5", m5, {"VALID", "STANDBY"}),
         ("News", news, {"CLEAR", "STANDBY", "NEWS_UNKNOWN"}),
-        ("Geopolitics", geopolitics, {"CLEAR", "RISK_OFF", "GEO_UNKNOWN"}),
-        ("Macro", macro, None),
+        ("Geopolitics", geopolitics, {"INACTIVE", "CLEAR", "RISK_OFF", "GEO_UNKNOWN"}),
+        ("Macro", macro, {"INACTIVE", "CLEAR", "MACRO_UNKNOWN"}),
     )
     for name, value, allowed_statuses in input_specs:
         validation_error = _validate_result(name, value, allowed_statuses)
@@ -308,34 +307,6 @@ def build_trade_plan(
         return _base_result(
             "STANDBY",
             f"News filter blocks entry with status {news_status}.",
-            h1,
-            m30,
-            m15,
-            m5,
-            news,
-            geopolitics,
-            macro,
-        )
-
-    geopolitics_status = str(geopolitics["status"])
-    if geopolitics_status != "CLEAR":
-        return _base_result(
-            "STANDBY",
-            f"Geopolitical filter blocks entry with status {geopolitics_status}.",
-            h1,
-            m30,
-            m15,
-            m5,
-            news,
-            geopolitics,
-            macro,
-        )
-
-    macro_status = str(macro["status"])
-    if macro_status != VALID_MACRO_STATUS:
-        return _base_result(
-            "STANDBY",
-            f"Macro filter is not CLEAR (status {macro_status}).",
             h1,
             m30,
             m15,
@@ -455,7 +426,7 @@ def build_trade_plan(
 
     return _base_result(
         "VALID",
-        "All data, news, geopolitical, alignment, rejection, location, and ATR-risk gates passed.",
+        "All data, news, alignment, rejection, location, and ATR-risk gates passed.",
         h1,
         m30,
         m15,
@@ -484,8 +455,8 @@ def build_suggestion(
         m15: Result from the M15 EMA-bias analysis.
         m5: Result from the M5 rejection and trade-plan analysis.
         news: Result from the economic high-impact news filter.
-        geopolitics: Result from the geopolitical keyword filter.
-        macro: Placeholder macro-filter result.
+        geopolitics: Inactive filter snapshot retained for output compatibility.
+        macro: Inactive filter snapshot retained for output compatibility.
 
     Returns:
         The same validated recommendation mapping returned by
