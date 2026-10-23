@@ -10,6 +10,12 @@ from tests._candles import flat_series
 from tests.test_planner import H1, M15_BULL, M30_UP, NEWS_CLEAR, m5_valid
 
 
+def test_runner_fetches_enough_m5_candles_for_analysis():
+    from src.analysis.m5_rejection import MIN_CANDLES
+
+    assert runner.CANDLE_COUNTS[Timeframe.M5] >= MIN_CANDLES
+
+
 def test_runner_does_not_import_inactive_filters():
     assert not hasattr(runner, "check_geopolitical_risk")
     assert not hasattr(runner, "check_macro_filter")

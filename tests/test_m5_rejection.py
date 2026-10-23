@@ -56,4 +56,12 @@ def test_structural_risk_above_1_5x_risk_atr_is_standby():
 
 def test_result_exposes_m5_atr_for_entry_zone_expiry():
     result = bullish_pin_setup(m5_swing_low=1995.0)
-    assert result["atr"] == pytest.approx(34.0 / 14.0)
+    # ATR(14) of the 14 candles before the Pin Bar: twelve TRs of 2.0, swing TRs 6.0 and 2.0.
+    assert result["atr"] == pytest.approx(32.0 / 14.0)
+
+
+def test_signal_candle_does_not_inflate_its_own_atr():
+    candles = flat_series(19, Timeframe.M5, half_range=0.5)
+    candles.append(candle(19, 2004.5, 2005.0, 1995.0, 2004.8))  # range 10.0 Pin Bar
+    result = calculate_m5_rejection(candles, bias="BULLISH", h1_supports=[1995.0])
+    assert result["atr"] == pytest.approx(1.0)

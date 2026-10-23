@@ -25,7 +25,8 @@ from src.models import Candle, Timeframe
 
 ATR_PERIOD: Final[int] = 14
 SWING_RADIUS: Final[int] = 2
-MIN_CANDLES: Final[int] = ATR_PERIOD + 1
+# ATR(14) needs 15 candles before the signal candle, plus the signal candle.
+MIN_CANDLES: Final[int] = ATR_PERIOD + 2
 
 PIN_BAR_WICK_RATIO: Final[float] = 0.60
 CANDLE_HALF_FACTOR: Final[float] = 0.50
@@ -135,7 +136,7 @@ def _true_range(previous: Candle, current: Candle) -> float:
 def _atr_sma(candles: Sequence[Candle]) -> float | None:
     """Calculate ATR(14) as the SMA of the latest True Range values."""
 
-    if len(candles) < MIN_CANDLES:
+    if len(candles) < ATR_PERIOD + 1:
         return None
 
     true_ranges = [
@@ -372,7 +373,7 @@ def calculate_m5_rejection(
     """Build an M5 rejection plan using H1/M30 structural context.
 
     Args:
-        candles: At least 15 closed M5 Candle objects ordered from oldest to
+        candles: At least 16 closed M5 Candle objects ordered from oldest to
             newest. The latest candle is tested for Pin Bar or Engulfing.
         bias: Directional bias, normally from the M15 EMA module.
         h1_supports: H1 support-zone prices.
@@ -398,10 +399,12 @@ def calculate_m5_rejection(
     if not _has_valid_input(candles):
         return _empty_result(
             "DATA_INVALID",
-            "At least 15 chronological closed M5 candles are required.",
+            f"At least {MIN_CANDLES} chronological closed M5 candles are required.",
         )
 
-    atr = _atr_sma(candles)
+    # The signal candle is excluded so its own range cannot inflate the ATR
+    # it is filtered against (BUG-012 decision, 2026-10-23).
+    atr = _atr_sma(candles[:-1])
     if atr is None or atr <= 0:
         return _empty_result("DATA_INVALID", "A positive ATR(14) is required.")
 

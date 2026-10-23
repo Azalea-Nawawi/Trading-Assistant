@@ -43,7 +43,7 @@ CANDLE_COUNTS: Final[dict[Timeframe, int]] = {
     Timeframe.H1: 60,
     Timeframe.M30: 50,
     Timeframe.M15: 60,
-    Timeframe.M5: 15,
+    Timeframe.M5: 20,
 }
 
 log = logging.getLogger(__name__)
