@@ -1,9 +1,8 @@
-"""MetaTrader 5 broker: v1 reads (D-041), v2 order actions (D-044).
+"""MetaTrader 5 broker: read-only access (D-041, DEC-001).
 
 The MetaTrader5 module is injected so tests use a fake; this package never
-imports it at module level. v2 is the "hands": it builds and sends order
-requests and returns the raw BrokerReply. It never classifies replies,
-retries, or decides anything; that is ``execution`` (D-012 item 5, D-044).
+imports it at module level. The broker only reads account, market and history
+data: the assistant never opens, modifies, or closes positions (DEC-001).
 
 MT5 times are the server wall clock stored as an epoch; they are read in
 ``server_timezone`` (IANA, from config) and converted to UTC.
@@ -14,7 +13,6 @@ no partial data is returned.
 from __future__ import annotations
 
 import logging
-import math
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -22,7 +20,6 @@ from zoneinfo import ZoneInfo
 
 from src.models import (
     AccountState,
-    BrokerReply,
     Candle,
     Deal,
     DealEntry,
@@ -302,188 +299,6 @@ class MT5Broker:
                 if magic is None or row.magic == magic
             ],
         )
-
-
-    # --- orders (v2, D-044): build, send once, return the raw reply -------------
-    #
-    # Preconditions that make a request unsendable (no SL, comment too long,
-    # unsupported order type) raise BrokerError and nothing is sent. Once a
-    # request is sent, every outcome, including None or an exception from
-    # order_send, is returned as a BrokerReply and never raised.
-
-    def _filling(self, name: str) -> int:
-        return getattr(self._mt5, f"ORDER_FILLING_{name}")
-
-    def _check_comment(self, comment: str) -> None:
-        if not isinstance(comment, str) or len(comment) > self._config.max_comment_length:
-            raise BrokerError(f"comment longer than {self._config.max_comment_length} characters; not sent")
-
-    @staticmethod
-    def _check_price(name: str, value: float | None, required: bool) -> None:
-        if value is None:
-            if required:
-                raise BrokerError(f"{name} is required; not sent")
-            return
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
-            raise BrokerError(f"{name} must be a positive price; not sent")
-
-    @staticmethod
-    def _check_ticket(ticket: int) -> None:
-        if not isinstance(ticket, int) or isinstance(ticket, bool) or ticket <= 0:
-            raise BrokerError("ticket must be a positive int; not sent")
-
-    @staticmethod
-    def _ticket_or_none(value: Any) -> int | None:
-        try:
-            number = int(value)
-        except (TypeError, ValueError):
-            return None
-        return number or None
-
-    def _order_send(self, action: str, request: dict[str, Any]) -> BrokerReply:
-        """Send once; return the reply as is. None or an exception = retcode None."""
-        sent = dict(request)
-        try:
-            result = self._mt5.order_send(request)
-        except Exception as exc:
-            reply = BrokerReply(action, self._clock(), sent, None, error=f"order_send raised {type(exc).__name__}")
-        else:
-            if result is None:
-                try:
-                    error = self._mt5.last_error()
-                    code = int(error[0]) if error else None
-                except Exception:
-                    code = None
-                reply = BrokerReply(action, self._clock(), sent, None, error=f"order_send returned None (last_error {code})")
-            else:
-                try:
-                    retcode = int(result.retcode)
-                except (AttributeError, TypeError, ValueError):
-                    retcode = None
-                reply = BrokerReply(
-                    action,
-                    self._clock(),
-                    sent,
-                    retcode,
-                    order=self._ticket_or_none(getattr(result, "order", None)),
-                    deal=self._ticket_or_none(getattr(result, "deal", None)),
-                    comment=self._credentials.scrub(str(getattr(result, "comment", ""))),
-                )
-        log.info(
-            "broker: %s retcode=%s order=%s deal=%s comment=%r %s",
-            action, reply.retcode, reply.order, reply.deal, reply.comment, reply.error,
-        )
-        return reply
-
-    def send_order(
-        self,
-        order_type: OrderType,
-        direction: Direction,
-        volume: float,
-        sl: float,
-        tp: float | None = None,
-        comment: str = "",
-        price: float | None = None,
-    ) -> BrokerReply:
-        """Send a MARKET or LIMIT order with SL (mandatory) and optional TP.
-
-        MARKET uses the current ask (BUY) or bid (SELL) and the market
-        filling; LIMIT needs ``price`` and uses the pending filling. Magic and
-        deviation come from config. STOP and other types are refused.
-        """
-        self._require_connected()
-        if order_type not in (OrderType.MARKET, OrderType.LIMIT):
-            raise BrokerError(f"order type {getattr(order_type, 'value', order_type)} not supported; not sent")
-        if direction not in (Direction.BUY, Direction.SELL):
-            raise BrokerError("direction must be BUY or SELL; not sent")
-        if isinstance(volume, bool) or not isinstance(volume, (int, float)) or not math.isfinite(volume) or volume <= 0:
-            raise BrokerError("volume must be > 0; not sent")
-        self._check_price("sl", sl, required=True)
-        self._check_price("tp", tp, required=False)
-        self._check_comment(comment)
-        mt5, buy = self._mt5, direction is Direction.BUY
-        request: dict[str, Any] = {"symbol": self._config.symbol, "volume": float(volume)}
-        if order_type is OrderType.MARKET:
-            tick = self.tick()
-            action = "send_market"
-            request.update(
-                action=mt5.TRADE_ACTION_DEAL,
-                type=mt5.ORDER_TYPE_BUY if buy else mt5.ORDER_TYPE_SELL,
-                price=tick.ask if buy else tick.bid,
-                deviation=self._config.deviation,
-                type_filling=self._filling(self._config.market_filling),
-            )
-        else:
-            self._check_price("price", price, required=True)
-            action = "send_limit"
-            request.update(
-                action=mt5.TRADE_ACTION_PENDING,
-                type=mt5.ORDER_TYPE_BUY_LIMIT if buy else mt5.ORDER_TYPE_SELL_LIMIT,
-                price=float(price),
-                type_filling=self._filling(self._config.pending_filling),
-            )
-        request.update(sl=float(sl), magic=self._config.magic, comment=comment, type_time=mt5.ORDER_TIME_GTC)
-        if tp is not None:
-            request["tp"] = float(tp)
-        return self._order_send(action, request)
-
-    def send_market(
-        self, direction: Direction, volume: float, sl: float, tp: float | None = None, comment: str = ""
-    ) -> BrokerReply:
-        return self.send_order(OrderType.MARKET, direction, volume, sl, tp, comment)
-
-    def send_limit(
-        self, direction: Direction, volume: float, price: float, sl: float, tp: float | None = None, comment: str = ""
-    ) -> BrokerReply:
-        return self.send_order(OrderType.LIMIT, direction, volume, sl, tp, comment, price=price)
-
-    def modify_sltp(self, ticket: int, sl: float, tp: float | None = None) -> BrokerReply:
-        """Set SL (mandatory) and TP on an open position; ``tp`` None sends 0.0 (no TP)."""
-        self._require_connected()
-        self._check_ticket(ticket)
-        self._check_price("sl", sl, required=True)
-        self._check_price("tp", tp, required=False)
-        request = {
-            "action": self._mt5.TRADE_ACTION_SLTP,
-            "symbol": self._config.symbol,
-            "position": ticket,
-            "sl": float(sl),
-            "tp": float(tp) if tp is not None else 0.0,
-            "magic": self._config.magic,
-        }
-        return self._order_send("modify_sltp", request)
-
-    def close_position(self, ticket: int, comment: str = "") -> BrokerReply:
-        """Close a whole open position at market (bid for BUY, ask for SELL)."""
-        self._require_connected()
-        self._check_ticket(ticket)
-        self._check_comment(comment)
-        matches = [p for p in self.positions() if p.ticket == ticket]
-        if not matches:
-            raise BrokerError(f"position {ticket} not found; not sent")
-        position, tick, mt5 = matches[0], self.tick(), self._mt5
-        buy = position.direction is Direction.BUY
-        request = {
-            "action": mt5.TRADE_ACTION_DEAL,
-            "symbol": self._config.symbol,
-            "position": ticket,
-            "volume": position.volume,
-            "type": mt5.ORDER_TYPE_SELL if buy else mt5.ORDER_TYPE_BUY,
-            "price": tick.bid if buy else tick.ask,
-            "deviation": self._config.deviation,
-            "magic": self._config.magic,
-            "comment": comment,
-            "type_time": mt5.ORDER_TIME_GTC,
-            "type_filling": self._filling(self._config.market_filling),
-        }
-        return self._order_send("close_position", request)
-
-    def cancel_order(self, ticket: int) -> BrokerReply:
-        """Remove a pending order."""
-        self._require_connected()
-        self._check_ticket(ticket)
-        request = {"action": self._mt5.TRADE_ACTION_REMOVE, "order": ticket, "magic": self._config.magic}
-        return self._order_send("cancel_order", request)
 
     # --- history (v2, D-044) --------------------------------------------------
 

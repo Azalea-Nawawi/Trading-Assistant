@@ -114,8 +114,6 @@ class FakeMT5:
                             magic=2026, comment="setup-2"),
         )
         self.none_for = set()
-        self.sent = []
-        self.send_result = SimpleNamespace(retcode=10009, order=501, deal=601, comment="ok")
         done = wall_epoch("2026-10-20T10:00") * 1000
         self.deals = (
             SimpleNamespace(ticket=601, order=501, position_id=701, symbol="XAUUSDm", type=0, entry=0,
@@ -175,12 +173,6 @@ class FakeMT5:
 
     def orders_get(self, symbol=None):
         return self._record("orders_get", self.orders)
-
-    def order_send(self, request):
-        self.sent.append(dict(request))
-        if isinstance(self.send_result, Exception):
-            raise self.send_result
-        return self.send_result
 
     def history_deals_get(self, date_from, date_to):
         self.history_range = (date_from, date_to)
@@ -482,137 +474,15 @@ def test_broker_check_refuses_non_demo():
         check.run_check(broker)
 
 
-# --- v2 order functions (D-044) ------------------------------------------------------------
-
-
-def send_result(retcode=10009, order=501, deal=601, comment="ok"):
-    return SimpleNamespace(retcode=retcode, order=order, deal=deal, comment=comment)
-
-
-def test_send_market_buy_request():
-    broker, fake = make_broker()
-    reply = broker.send_market(Direction.BUY, 0.01, sl=4095.0, tp=4110.0, comment="BS2-2610210735")
-    request = fake.sent[-1]
-    assert request == {
-        "action": FakeMT5.TRADE_ACTION_DEAL,
-        "symbol": "XAUUSDm",
-        "volume": 0.01,
-        "type": FakeMT5.ORDER_TYPE_BUY,
-        "price": 4100.24,  # ask
-        "deviation": 20,
-        "type_filling": FakeMT5.ORDER_FILLING_IOC,
-        "sl": 4095.0,
-        "magic": 260044,
-        "comment": "BS2-2610210735",
-        "type_time": FakeMT5.ORDER_TIME_GTC,
-        "tp": 4110.0,
-    }
-    assert (reply.action, reply.retcode, reply.order, reply.deal, reply.comment) == ("send_market", 10009, 501, 601, "ok")
-    assert reply.request == request and reply.time == NOW and reply.error == ""
-
-
-def test_send_market_sell_uses_bid_and_omits_missing_tp():
-    broker, fake = make_broker()
-    broker.send_market(Direction.SELL, 0.02, sl=4105.0)
-    request = fake.sent[-1]
-    assert request["type"] == FakeMT5.ORDER_TYPE_SELL and request["price"] == 4100.0
-    assert "tp" not in request
-
-
-def test_send_limit_request_uses_pending_filling():
-    broker, fake = make_broker()
-    reply = broker.send_limit(Direction.SELL, 0.01, price=4120.0, sl=4125.0, tp=4110.0, comment="SS2-2610210740")
-    request = fake.sent[-1]
-    assert request["action"] == FakeMT5.TRADE_ACTION_PENDING
-    assert request["type"] == FakeMT5.ORDER_TYPE_SELL_LIMIT
-    assert request["price"] == 4120.0 and request["type_filling"] == FakeMT5.ORDER_FILLING_RETURN
-    assert "deviation" not in request and request["magic"] == 260044
-    assert reply.action == "send_limit"
-
-
-def test_modify_close_cancel_requests():
-    broker, fake = make_broker()
-    broker.modify_sltp(11, sl=4108.0, tp=None)
-    assert fake.sent[-1] == {
-        "action": FakeMT5.TRADE_ACTION_SLTP, "symbol": "XAUUSDm", "position": 11, "sl": 4108.0, "tp": 0.0, "magic": 260044,
-    }
-    broker.close_position(11, comment="close")  # SELL position 0.02 -> BUY at ask
-    request = fake.sent[-1]
-    assert (request["action"], request["position"], request["volume"]) == (FakeMT5.TRADE_ACTION_DEAL, 11, 0.02)
-    assert (request["type"], request["price"]) == (FakeMT5.ORDER_TYPE_BUY, 4100.24)
-    assert request["type_filling"] == FakeMT5.ORDER_FILLING_IOC and request["magic"] == 260044
-    broker.cancel_order(21)
-    assert fake.sent[-1] == {"action": FakeMT5.TRADE_ACTION_REMOVE, "order": 21, "magic": 260044}
+# --- Read-only broker (DEC-001) ---------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
-    "call",
-    [
-        lambda b: b.send_market(Direction.BUY, 0.01, sl=None),
-        lambda b: b.send_limit(Direction.BUY, 0.01, price=4090.0, sl=None),
-        lambda b: b.modify_sltp(11, sl=None),
-        lambda b: b.send_market(Direction.BUY, 0.01, sl=4095.0, comment="x" * 25),
-        lambda b: b.close_position(11, comment="x" * 25),
-        lambda b: b.send_order(OrderType.STOP, Direction.BUY, 0.01, sl=4095.0, price=4110.0),
-        lambda b: b.send_market(Direction.BUY, 0.0, sl=4095.0),
-        lambda b: b.send_limit(Direction.BUY, 0.01, price=None, sl=4085.0),
-        lambda b: b.close_position(999),
-        lambda b: b.cancel_order(0),
-    ],
-    ids=["no-sl", "limit-no-sl", "modify-no-sl", "comment-25", "close-comment-25", "stop", "volume-0",
-         "limit-no-price", "unknown-position", "bad-ticket"],
+    "name",
+    ["send_order", "send_market", "send_limit", "modify_sltp", "close_position", "cancel_order", "_order_send"],
 )
-def test_unsendable_requests_never_call_order_send(call):
-    broker, fake = make_broker()
-    with pytest.raises(BrokerError, match="not sent"):
-        call(broker)
-    assert fake.sent == []
-
-
-def test_comment_of_24_characters_is_sent():
-    broker, fake = make_broker()
-    broker.send_market(Direction.BUY, 0.01, sl=4095.0, comment="x" * 24)
-    assert fake.sent[-1]["comment"] == "x" * 24
-
-
-def test_none_and_exception_become_reply_with_retcode_none():
-    broker, fake = make_broker()
-    fake.send_result = None
-    fake.error = (-2, "Invalid params")
-    reply = broker.send_market(Direction.BUY, 0.01, sl=4095.0)
-    assert reply.retcode is None and reply.order is None and "last_error -2" in reply.error
-    fake.send_result = RuntimeError("terminal gone")
-    reply = broker.send_market(Direction.BUY, 0.01, sl=4095.0)
-    assert reply.retcode is None and reply.error == "order_send raised RuntimeError"
-
-
-def test_reply_is_raw_not_classified():
-    broker, fake = make_broker()
-    fake.send_result = send_result(retcode=10031, order=0, deal=0, comment="No connection")
-    reply = broker.send_market(Direction.BUY, 0.01, sl=4095.0)
-    assert (reply.retcode, reply.order, reply.deal, reply.comment) == (10031, None, None, "No connection")
-    assert not hasattr(reply, "outcome")
-
-
-def test_credentials_never_in_reply(caplog):
-    caplog.set_level(logging.DEBUG)
-    broker, fake = make_broker()
-    fake.send_result = send_result(comment=f"login {LOGIN} pass {PASSWORD}")
-    reply = broker.send_market(Direction.BUY, 0.01, sl=4095.0)
-    for text in (repr(reply), str(reply.request), reply.comment, caplog.text):
-        assert PASSWORD not in text and str(LOGIN) not in text
-
-
-def test_broker_has_no_retry_or_classification():
-    names = {name for name in dir(MT5Broker) if not name.startswith("_")}
-    assert not {n for n in names if "retry" in n or "classif" in n or "outcome" in n}
-
-
-def test_order_functions_require_connection():
-    broker, fake = make_broker(connect=False)
-    with pytest.raises(BrokerError, match="not connected"):
-        broker.send_market(Direction.BUY, 0.01, sl=4095.0)
-    assert fake.sent == []
+def test_broker_cannot_open_modify_or_close_positions(name):
+    assert not hasattr(MT5Broker, name)
 
 
 # --- v2 history (D-044) ------------------------------------------------------------------------
