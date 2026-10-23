@@ -1,8 +1,9 @@
 """H1 support and resistance calculation from confirmed swing points.
 
 This module implements the H1 Support & Resistance rules from Spesifikasi
-Final v1.0: two-candle swing confirmation, a 60-candle lookback, the three
-latest confirmed swing highs and lows, and USD 1.50 proximity clustering.
+Final v1.0 and DEC-004: collect every confirmed swing (two-candle
+confirmation) in a 60-candle lookback, merge levels within USD 1.50 into zones
+priced at their mean, then keep the three zones nearest to price on each side.
 
 All input candles must already be closed and ordered from oldest to newest.
 The latest candle close is used as the current price. Swing candidates are
@@ -20,7 +21,6 @@ from src.models import Candle, Timeframe
 
 LOOKBACK_CANDLES: Final[int] = 60
 SWING_RADIUS: Final[int] = 2
-MAX_SWINGS_PER_SIDE: Final[int] = 3
 ZONE_DISTANCE_USD: Final[float] = 1.50
 MAX_ZONES_PER_SIDE: Final[int] = 3
 
@@ -74,7 +74,7 @@ def _has_valid_input(candles: Sequence[Candle]) -> bool:
 def _confirmed_swings(
     candles: Sequence[Candle],
 ) -> tuple[list[float], list[float]]:
-    """Return the latest confirmed swing highs and lows from the lookback."""
+    """Return every confirmed swing high and low in the lookback (DEC-004 step 1)."""
 
     lookback = candles[-LOOKBACK_CANDLES:]
     swing_highs: list[float] = []
@@ -82,28 +82,16 @@ def _confirmed_swings(
 
     # The two right-hand candles required by the definition make each point
     # anti-look-ahead safe.
-    first_candidate = SWING_RADIUS
-    last_candidate = len(lookback) - SWING_RADIUS
-    for index in range(last_candidate - 1, first_candidate - 1, -1):
+    for index in range(SWING_RADIUS, len(lookback) - SWING_RADIUS):
         candle = lookback[index]
         left = lookback[index - SWING_RADIUS : index]
         right = lookback[index + 1 : index + SWING_RADIUS + 1]
 
-        if len(swing_highs) < MAX_SWINGS_PER_SIDE and all(
-            candle.high > neighbour.high for neighbour in (*left, *right)
-        ):
+        if all(candle.high > neighbour.high for neighbour in (*left, *right)):
             swing_highs.append(candle.high)
 
-        if len(swing_lows) < MAX_SWINGS_PER_SIDE and all(
-            candle.low < neighbour.low for neighbour in (*left, *right)
-        ):
+        if all(candle.low < neighbour.low for neighbour in (*left, *right)):
             swing_lows.append(candle.low)
-
-        if (
-            len(swing_highs) == MAX_SWINGS_PER_SIDE
-            and len(swing_lows) == MAX_SWINGS_PER_SIDE
-        ):
-            break
 
     return swing_highs, swing_lows
 
@@ -196,7 +184,6 @@ def calculate_h1_sr(candles: Sequence[Candle]) -> H1SRResult:
 __all__ = [
     "H1SRResult",
     "LOOKBACK_CANDLES",
-    "MAX_SWINGS_PER_SIDE",
     "MAX_ZONES_PER_SIDE",
     "SWING_RADIUS",
     "ZONE_DISTANCE_USD",

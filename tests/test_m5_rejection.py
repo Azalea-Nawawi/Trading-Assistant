@@ -1,23 +1,8 @@
 """M5 rejection shape, SL and plan rules (DEC-005, DEC-007)."""
 
-from datetime import datetime, timedelta, timezone
-
 from src.analysis.m5_rejection import _detect_rejection_shape
-from src.models import Candle, Timeframe
 
-START = datetime(2026, 10, 23, 8, 0, tzinfo=timezone.utc)
-
-
-def candle(index, open_, high, low, close, timeframe=Timeframe.M5):
-    return Candle(
-        symbol="XAUUSDm",
-        timeframe=timeframe,
-        open_time=START + timedelta(seconds=timeframe.seconds * index),
-        open=open_,
-        high=high,
-        low=low,
-        close=close,
-    )
+from tests._candles import candle
 
 
 def test_identical_bodies_are_not_engulfing():
