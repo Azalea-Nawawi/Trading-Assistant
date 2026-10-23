@@ -105,6 +105,36 @@
 
 ---
 
+## DEC-010 — Level SL Struktur Harus di Luar Entry Zone
+
+**Tanggal:** 2026-10-23  
+**Keputusan:** Level struktur untuk SL (Swing M5 atau S/R H1) hanya sah jika berada di luar Entry Zone, di sisi proteksi:
+- BUY: level `< Entry_Zone.low` → dipilih level tertinggi yang memenuhi
+- SELL: level `> Entry_Zone.high` → dipilih level terendah yang memenuhi
+- Level yang menjadi pusat Entry Zone tidak pernah dipakai sebagai SL
+- Tidak ada level yang memenuhi → `STANDBY` (tidak ada struktur yang jelas untuk SL)
+
+SL = level terpilih ± buffer (DEC-007), lalu tetap harus lolos `Risk_Struct ≤ Risk_ATR × 1.5`.  
+**Alasan:** Entry Zone dibangun di sekitar level H1/M30. Kalau level yang sama dipakai untuk SL, SL hanya sebesar buffer (0.40 USD) dari entry dan berada di dalam zona sendiri, jadi tidak bermakna secara struktur (BUG-007).  
+**Implikasi kode:** `src/analysis/m5_rejection.py` — `_structural_stop_level` menerima `entry_zone`, bukan `entry`.
+
+---
+
+## DEC-011 — ATR M5 Tidak Menyertakan Candle Sinyal
+
+**Tanggal:** 2026-10-23  
+**Keputusan:** ATR(14) M5 dihitung dari 14 True Range candle tertutup **sebelum** candle rejection (candle sinyal). Range candle sinyal tidak ikut dihitung. ATR yang sama dipakai untuk:
+- Filter ukuran rejection: `High − Low ≥ 0.8 × ATR`
+- Toleransi lokasi: `± 0.5 × ATR`
+- `Risk_ATR` (DEC-007)
+- Kedaluwarsa Entry Zone: `1.0 × ATR` (DEC-006)
+
+Akibatnya M5 butuh minimal 16 candle tertutup (15 untuk ATR + 1 candle sinyal); runner mengambil 20.  
+**Alasan:** Kalau candle sinyal ikut dihitung, range-nya sendiri menaikkan ATR yang dipakai untuk menyaringnya, sehingga filter ukuran menjadi self-referential (BUG-012).  
+**Implikasi kode:** `src/analysis/m5_rejection.py` (`_atr_sma(candles[:-1])`, `MIN_CANDLES = 16`), `src/assistant/runner.py` (`CANDLE_COUNTS[M5] = 20`).
+
+---
+
 ## Template Keputusan Baru
 
 ```

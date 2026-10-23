@@ -104,7 +104,7 @@
 **BUG-007 — Level SL struktur bisa sama dengan level entry**  
 ✅ **FIXED** — `a128434` (2026-10-23)  
 `src/analysis/m5_rejection.py:302-310` + `451-455, 480-492`. Entry Zone dipusatkan pada level H1 (`entry = entry_level`), lalu `_structural_stop_level` memilih level H1 `<= entry` → level yang sama terpilih → SL = entry − 0.40 USD. Saat ini tertutup oleh batas bawah 0.8× (BUG-003); begitu BUG-003 diperbaiki, bot akan VALID dengan SL 0.40 USD yang tidak bermakna secara struktur. Harus diperbaiki bersamaan dengan BUG-003.  
-**Interpretasi fix:** level SL struktur harus berada di luar Entry Zone (BUY: `< zone.low`, SELL: `> zone.high`); level pusat zona tidak dipakai sebagai SL.
+**Interpretasi fix (DEC-010):** level SL struktur harus berada di luar Entry Zone (BUY: `< zone.low`, SELL: `> zone.high`); level pusat zona tidak dipakai sebagai SL.
 
 ### 🟡 WARNING
 
@@ -127,7 +127,7 @@
 **BUG-012 — ATR M5 ikut menghitung candle rejection itu sendiri**  
 ✅ **FIXED** — `127fafa` (2026-10-23)  
 `src/analysis/m5_rejection.py:138-142, 399-411`. Filter `range ≥ 0.8 × ATR(14)` bersifat self-referential (range candle ikut menaikkan ATR). Perlu keputusan: ATR dari 14 candle sebelum candle sinyal atau termasuk.  
-**Keputusan (2026-10-23):** ATR dari 14 candle **sebelum** candle sinyal. M5 sekarang butuh minimal 16 candle; runner mengambil 20.
+**Keputusan (2026-10-23, DEC-011):** ATR dari 14 candle **sebelum** candle sinyal. M5 sekarang butuh minimal 16 candle; runner mengambil 20.
 
 **BUG-013 — Broker client masih punya fungsi eksekusi order**  
 ✅ **FIXED** — `b0f2394` (2026-10-23)  
@@ -168,7 +168,7 @@ Tidak ada test untuk `h1_sr`, `m30_structure`, `m15_bias`, `m5_rejection`, `plan
 - [ ] Fix BUG-002 — symbol mapping
 - [x] Fix BUG-001, BUG-003 s/d BUG-007 (TDD, satu commit per bug)
 - [x] Fix WARNING BUG-008 s/d BUG-015 (TDD, satu commit per bug)
-- [ ] Catat keputusan BUG-007 (SL di luar Entry Zone) dan BUG-012 (ATR tanpa candle sinyal) sebagai DEC baru di DECISIONS.md
+- [x] Catat keputusan BUG-007 → DEC-010 dan BUG-012 → DEC-011 di DECISIONS.md
 - [ ] Validasi output laporan Telegram
 - [ ] Forward test demo — minimal 2 minggu
 - [ ] `CLAUDE.md`, `CHECKPOINT.md`, `DECISIONS.md` di repo ← sedang dibuat
