@@ -447,6 +447,25 @@ def test_repo_broker_config():
         broker_config_from_mapping(dict(vars(config), market_filling="BOC"))
 
 
+def test_requested_symbol_overrides_config_symbol():
+    # BUG-002: --symbol XAUUSD must connect to XAUUSD, not the TOML XAUUSDm.
+    config = load_broker_config(ROOT / "config" / "broker.toml", symbol="XAUUSD")
+    assert config.symbol == "XAUUSD"
+    with pytest.raises(ValueError):
+        load_broker_config(ROOT / "config" / "broker.toml", symbol=" ")
+
+
+def test_runner_passes_requested_symbol_to_broker(monkeypatch):
+    from src.assistant import runner
+
+    monkeypatch.setattr(runner, "parse_env_text", lambda text: {})
+    monkeypatch.setattr(runner, "credentials_from_env", lambda values: CREDS)
+    monkeypatch.setattr(runner, "load_mt5_module", FakeMT5)
+    monkeypatch.setattr(runner.Path, "read_text", lambda self, encoding=None: "")
+    monkeypatch.chdir(ROOT)
+    assert runner._load_broker("XAUUSD")._config.symbol == "XAUUSD"
+
+
 # --- scripts/broker_check.py ------------------------------------------------------------------
 
 

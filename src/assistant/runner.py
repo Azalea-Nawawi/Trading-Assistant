@@ -15,7 +15,6 @@ v1.0 and are not part of the evaluation chain (DEC-002).
 from __future__ import annotations
 
 import logging
-from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Final
@@ -56,9 +55,8 @@ class _StaleDataError(Exception):
 def _load_broker(symbol: str) -> MT5Broker:
     """Load non-secret config and credentials, then construct the read-only broker."""
 
-    config = load_broker_config(DEFAULT_CONFIG_PATH)
-    if config.symbol != symbol:
-        config = replace(config, symbol=symbol)
+    config = load_broker_config(DEFAULT_CONFIG_PATH, symbol=symbol)
+    log.info("runner: using requested broker symbol=%s", config.symbol)
 
     env_values = parse_env_text(DEFAULT_ENV_PATH.read_text(encoding="utf-8"))
     credentials = credentials_from_env(env_values)

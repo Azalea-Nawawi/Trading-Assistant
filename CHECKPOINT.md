@@ -7,7 +7,7 @@
 ## Status Terakhir
 
 **Tanggal:** 2026-10-23  
-**Status overall:** 🟡 PARTIAL — semua bug CRITICAL dan WARNING dari audit sudah diperbaiki; BUG-002 dan INFO masih open
+**Status overall:** 🟡 PARTIAL — semua bug CRITICAL dan WARNING dari audit serta BUG-002 sudah diperbaiki; temuan INFO masih open
 
 ---
 
@@ -71,10 +71,10 @@
 **Fix:** Hapus geopolitics & macro dari runner dan dari gate planner (DEC-002)  
 
 ### BUG-002 — Simbol salah
-**Status:** 🔴 OPEN  
+**Status:** ✅ FIXED — commit remote `e0197f7` + `f4382d8`, digabung di merge 2026-10-23  
 **Gejala:** Run dengan `--symbol XAUUSD` tapi connect ke `XAUUSDm`  
 **Lokasi:** `config/broker.toml` atau `src/broker/config.py`  
-**Fix:** Pastikan symbol mapping benar sesuai broker aktif  
+**Fix:** `load_broker_config(path, symbol=...)` menimpa symbol TOML dengan symbol dari `--symbol` sebelum validasi; runner memakainya dan mencatat symbol yang dipakai di log.  
 **Catatan audit:** Kode sekarang (`runner.py:59-60`) menimpa `config.symbol` dengan argumen CLI, jadi `--symbol XAUUSD` seharusnya connect ke `XAUUSD`. Gejala perlu direproduksi ulang. `DEFAULT_SYMBOL = "XAUUSDm"` di-hardcode di `runner.py:42`, duplikat dari `broker.toml` → dua sumber kebenaran.
 
 ---
@@ -165,7 +165,7 @@ Tidak ada test untuk `h1_sr`, `m30_structure`, `m15_bias`, `m5_rejection`, `plan
 
 ## Yang Belum Dikerjakan
 
-- [ ] Fix BUG-002 — symbol mapping
+- [x] Fix BUG-002 — symbol mapping
 - [x] Fix BUG-001, BUG-003 s/d BUG-007 (TDD, satu commit per bug)
 - [x] Fix WARNING BUG-008 s/d BUG-015 (TDD, satu commit per bug)
 - [x] Catat keputusan BUG-007 → DEC-010 dan BUG-012 → DEC-011 di DECISIONS.md

@@ -50,6 +50,26 @@ def broker_config_from_mapping(data: dict[str, Any]) -> BrokerConfig:
     return BrokerConfig(**data)
 
 
-def load_broker_config(path: Path) -> BrokerConfig:
+def load_broker_config(path: Path, symbol: str | None = None) -> BrokerConfig:
+    """Load broker settings and optionally override the configured symbol.
+
+    Args:
+        path: Path to the TOML broker configuration.
+        symbol: Requested MT5 symbol from the caller, or None to use the TOML
+            value.
+
+    Returns:
+        A validated BrokerConfig whose symbol matches the explicit override
+        when one is supplied.
+
+    Raises:
+        OSError: If the configuration file cannot be read.
+        tomllib.TOMLDecodeError: If the file is not valid TOML.
+        ValueError: If settings are missing, unknown, or invalid.
+    """
+
     with open(path, "rb") as handle:
-        return broker_config_from_mapping(tomllib.load(handle))
+        data = tomllib.load(handle)
+    if symbol is not None:
+        data["symbol"] = symbol
+    return broker_config_from_mapping(data)
