@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from math import isfinite
 from statistics import fmean
-from typing import Final, Literal, Mapping, Sequence, TypedDict
+from typing import Final, Literal, Sequence, TypedDict
 
 from src.models import Candle, Timeframe
 
@@ -27,6 +27,7 @@ SWING_RADIUS: Final[int] = 2
 MIN_CANDLES: Final[int] = ATR_PERIOD + 1
 
 PIN_BAR_WICK_RATIO: Final[float] = 0.60
+CANDLE_HALF_FACTOR: Final[float] = 0.50
 MIN_REJECTION_RANGE_ATR: Final[float] = 0.80
 LOCATION_TOLERANCE_ATR: Final[float] = 0.50
 SL_ATR_MULTIPLIER: Final[float] = 1.20
@@ -155,7 +156,7 @@ def _detect_rejection_shape(
     body_high = max(current.open, current.close)
     lower_wick = body_low - current.low
     upper_wick = current.high - body_high
-    midpoint = current.low + (candle_range * 0.5)
+    midpoint = current.low + (candle_range * CANDLE_HALF_FACTOR)
 
     # Wick ratios and close-half checks define the two Pin Bar directions.
     bullish_pin = (
@@ -558,6 +559,7 @@ def calculate_m5_rejection(
 __all__ = [
     "ATR_PERIOD",
     "Bias",
+    "CANDLE_HALF_FACTOR",
     "Direction",
     "EntryZone",
     "LOCATION_TOLERANCE_ATR",
