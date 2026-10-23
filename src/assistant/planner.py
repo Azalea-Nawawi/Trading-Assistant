@@ -7,12 +7,10 @@ then structural-risk validation between 0.8x and 2.0x ATR. Only when every
 active gate passes is the final status VALID; otherwise the result is STANDBY,
 except incomplete or invalid module results which produce DATA_INVALID.
 
-Geopolitics and Macro are inactive in v1.0. Their snapshots are retained only
-for output compatibility and never participate in status evaluation.
-
-The planner is pure: it receives already-computed mappings, performs no MT5
-access and makes no network calls. Every Telegram summary includes the warning
-that the final transaction decision remains with the trader.
+The planner is pure: it receives only active analysis and News mappings,
+performs no MT5 access and makes no network calls. Every Telegram summary
+includes the warning that the final transaction decision remains with the
+trader.
 """
 
 from __future__ import annotations
@@ -126,8 +124,6 @@ def _base_result(
     m15: object,
     m5: object,
     news: object,
-    geopolitics: object,
-    macro: object,
     plan: TradePlan | None = None,
 ) -> PlannerResult:
     """Build the common planner result and Telegram summary."""
@@ -140,8 +136,6 @@ def _base_result(
     }
     filter_snapshots = {
         "news": _snapshot(news),
-        "geopolitics": _snapshot(geopolitics),
-        "macro": _snapshot(macro),
     }
     return {
         "status": status,
@@ -254,8 +248,6 @@ def build_trade_plan(
     m15: Mapping[str, object],
     m5: Mapping[str, object],
     news: Mapping[str, object],
-    geopolitics: Mapping[str, object],
-    macro: Mapping[str, object],
 ) -> PlannerResult:
     """Combine analysis and filters into one final trading recommendation.
 
@@ -265,8 +257,6 @@ def build_trade_plan(
         m15: Result from the M15 EMA-bias analysis.
         m5: Result from the M5 rejection and trade-plan analysis.
         news: Result from the economic high-impact news filter.
-        geopolitics: Inactive filter snapshot retained for output compatibility.
-        macro: Inactive filter snapshot retained for output compatibility.
 
     Returns:
         A nested mapping containing the original analysis/filter snapshots, a
@@ -284,8 +274,6 @@ def build_trade_plan(
         ("M15", m15, {"BULLISH", "BEARISH", "NEUTRAL"}),
         ("M5", m5, {"VALID", "STANDBY"}),
         ("News", news, {"CLEAR", "STANDBY", "NEWS_UNKNOWN"}),
-        ("Geopolitics", geopolitics, {"INACTIVE", "CLEAR", "RISK_OFF", "GEO_UNKNOWN"}),
-        ("Macro", macro, {"INACTIVE", "CLEAR", "MACRO_UNKNOWN"}),
     )
     for name, value, allowed_statuses in input_specs:
         validation_error = _validate_result(name, value, allowed_statuses)
@@ -298,8 +286,6 @@ def build_trade_plan(
                 m15,
                 m5,
                 news,
-                geopolitics,
-                macro,
             )
 
     news_status = str(news["status"])
@@ -312,8 +298,6 @@ def build_trade_plan(
             m15,
             m5,
             news,
-            geopolitics,
-            macro,
         )
 
     m15_status = str(m15["status"])
@@ -334,8 +318,6 @@ def build_trade_plan(
             m15,
             m5,
             news,
-            geopolitics,
-            macro,
         )
 
     if not isinstance(m5, Mapping):
@@ -347,8 +329,6 @@ def build_trade_plan(
             m15,
             m5,
             news,
-            geopolitics,
-            macro,
         )
 
     if m5.get("status") != "VALID":
@@ -360,8 +340,6 @@ def build_trade_plan(
             m15,
             m5,
             news,
-            geopolitics,
-            macro,
         )
 
     plan, plan_error = _extract_trade_plan(m5)
@@ -375,8 +353,6 @@ def build_trade_plan(
             m15,
             m5,
             news,
-            geopolitics,
-            macro,
         )
 
     if plan["direction"] != aligned_direction:
@@ -388,8 +364,6 @@ def build_trade_plan(
             m15,
             m5,
             news,
-            geopolitics,
-            macro,
         )
 
     risk_struct = _as_float(m5.get("risk_struct"))
@@ -403,8 +377,6 @@ def build_trade_plan(
             m15,
             m5,
             news,
-            geopolitics,
-            macro,
         )
 
     minimum_risk = MIN_RISK_ATR_MULTIPLIER * risk_atr
@@ -420,8 +392,6 @@ def build_trade_plan(
             m15,
             m5,
             news,
-            geopolitics,
-            macro,
         )
 
     return _base_result(
@@ -432,8 +402,6 @@ def build_trade_plan(
         m15,
         m5,
         news,
-        geopolitics,
-        macro,
         plan=plan,
     )
 
@@ -444,8 +412,6 @@ def build_suggestion(
     m15: Mapping[str, object],
     m5: Mapping[str, object],
     news: Mapping[str, object],
-    geopolitics: Mapping[str, object],
-    macro: Mapping[str, object],
 ) -> PlannerResult:
     """Build the final suggestion using the planner's canonical decision flow.
 
@@ -455,8 +421,6 @@ def build_suggestion(
         m15: Result from the M15 EMA-bias analysis.
         m5: Result from the M5 rejection and trade-plan analysis.
         news: Result from the economic high-impact news filter.
-        geopolitics: Inactive filter snapshot retained for output compatibility.
-        macro: Inactive filter snapshot retained for output compatibility.
 
     Returns:
         The same validated recommendation mapping returned by
@@ -469,8 +433,6 @@ def build_suggestion(
         m15=m15,
         m5=m5,
         news=news,
-        geopolitics=geopolitics,
-        macro=macro,
     )
 
 
