@@ -171,10 +171,11 @@ def _detect_rejection_shape(
     previous_body_low = min(previous.open, previous.close)
     previous_body_high = max(previous.open, previous.close)
     current_body_engulfs = (
-        body_low <= previous_body_low and body_high >= previous_body_high
+        body_low < previous_body_low and body_high > previous_body_high
     )
 
-    # The current body must fully contain the previous body and close in its direction.
+    # The current body must strictly contain the previous body (DEC-005: an
+    # identical or edge-sharing body is not engulfing) and close in its direction.
     bullish_engulfing = current_body_engulfs and current.close > current.open
     bearish_engulfing = current_body_engulfs and current.close < current.open
 
