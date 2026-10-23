@@ -36,7 +36,7 @@ from src.broker import (
 from src.filters.geopolitics import check_geopolitical_risk
 from src.filters.macro import check_macro_filter
 from src.filters.news import DEFAULT_CALENDAR_PATH, check_news_filter
-from src.models import Timeframe
+from src.models import Candle, Timeframe
 
 
 DEFAULT_SYMBOL: Final[str] = "XAUUSDm"
@@ -64,7 +64,7 @@ def _load_broker(symbol: str) -> MT5Broker:
     return MT5Broker(load_mt5_module(), config, credentials)
 
 
-def _collect_candles(broker: MT5Broker) -> dict[Timeframe, list]:
+def _collect_candles(broker: MT5Broker) -> dict[Timeframe, list[Candle]]:
     """Fetch closed candles for each analysis timeframe from MT5."""
 
     # MT5Broker.candles drops the currently forming candle before returning.
