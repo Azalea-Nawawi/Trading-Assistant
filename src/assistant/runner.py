@@ -1,16 +1,15 @@
 """Semi-auto analysis cycle entry point.
 
 This module implements the runner flow from Spesifikasi Final v1.0:
-read only closed candles from MT5, run H1/M30/M15/M5 analysis, run News,
-Geopolitics, and Macro filters, combine the results through
-assistant.planner.build_suggestion, then print the Telegram-ready summary.
+read only closed candles from MT5, run H1/M30/M15/M5 analysis, run the News
+filter, combine the results through assistant.planner.build_suggestion, then
+print the Telegram-ready summary.
 
 The runner uses UTC internally, never places or modifies orders, and returns
 DATA_INVALID when required broker data or configuration cannot be obtained.
 Credentials are loaded from .env and broker settings from config/broker.toml;
-no credentials are hardcoded. The Macro filter is currently a fail-closed
-placeholder, and the Geopolitics filter receives no network headlines until a
-separate source is provided.
+no credentials are hardcoded. Geopolitics and Macro filters are inactive in
+v1.0 and are not part of the evaluation chain (DEC-002).
 """
 
 from __future__ import annotations
@@ -33,8 +32,6 @@ from src.broker import (
     load_mt5_module,
     parse_env_text,
 )
-from src.filters.geopolitics import check_geopolitical_risk
-from src.filters.macro import check_macro_filter
 from src.filters.news import DEFAULT_CALENDAR_PATH, check_news_filter
 from src.models import Candle, Timeframe
 
@@ -79,16 +76,12 @@ def _invalid_result(reason: str) -> PlannerResult:
 
     invalid_analysis = {"status": "DATA_INVALID", "reason": reason}
     unknown_filter = {"status": "NEWS_UNKNOWN", "reason": reason}
-    geopolitics = {"status": "GEO_UNKNOWN", "reason": reason}
-    macro = {"status": "MACRO_UNKNOWN", "reason": reason}
     return build_suggestion(
         h1=invalid_analysis,
         m30=invalid_analysis,
         m15=invalid_analysis,
         m5=invalid_analysis,
         news=unknown_filter,
-        geopolitics=geopolitics,
-        macro=macro,
     )
 
 
@@ -115,12 +108,8 @@ def _analyse_and_filter(
         m30_prev_swing_low=m30["prev_swing_low"],
     )
 
-    # News is the only currently implemented external calendar filter.
+    # News is the only active filter in v1.0 (DEC-002).
     news = check_news_filter(now_utc, DEFAULT_CALENDAR_PATH)
-
-    # No network scraping is performed here; absent headlines fail closed.
-    geopolitics = check_geopolitical_risk(None)
-    macro = check_macro_filter()
 
     # The planner applies the mandatory gate order and returns the final result.
     return build_suggestion(
@@ -129,8 +118,6 @@ def _analyse_and_filter(
         m15=m15,
         m5=m5,
         news=news,
-        geopolitics=geopolitics,
-        macro=macro,
     )
 
 
