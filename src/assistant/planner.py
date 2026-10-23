@@ -276,7 +276,7 @@ def build_trade_plan(
 
     input_specs: Sequence[tuple[str, object, set[str] | None]] = (
         ("H1", h1, {VALID_H1_STATUS}),
-        ("M30", m30, {"UPTREND", "DOWNTREND", "SIDEWAYS", "TRANSITION"}),
+        ("M30", m30, {"UPTREND", "DOWNTREND", "SIDEWAYS", "TRANSITION", "UNCLEAR"}),
         ("M15", m15, {"BULLISH", "BEARISH", "NEUTRAL"}),
         ("M5", m5, {"VALID", "STANDBY"}),
         ("News", news, {"CLEAR", "STANDBY", "NEWS_UNKNOWN"}),

@@ -107,3 +107,8 @@ def test_missing_m5_atr_is_data_invalid():
     m5 = m5_valid()
     del m5["atr"]
     assert suggest(m5=m5)["status"] == "DATA_INVALID"
+
+
+def test_m30_unclear_is_standby_not_data_invalid():
+    result = suggest(m30={"status": "UNCLEAR"})
+    assert result["status"] == "STANDBY"

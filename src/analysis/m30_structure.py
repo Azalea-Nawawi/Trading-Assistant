@@ -3,7 +3,8 @@
 This module implements the M30 structure rules from Spesifikasi Final v1.0:
 strict two-candle-left and two-candle-right swing confirmation, a 50-candle
 M30 lookback, UPTREND and DOWNTREND swing-direction checks, SIDEWAYS
-comparison against one ATR(14), and TRANSITION for all remaining structures.
+comparison against one ATR(14), TRANSITION for all remaining structures, and
+UNCLEAR when there are not enough confirmed swings to read a structure.
 
 All input candles must already be closed and ordered from oldest to newest.
 The two right-hand candles are required before a swing can be considered, so
@@ -29,6 +30,7 @@ StructureStatus = Literal[
     "DOWNTREND",
     "SIDEWAYS",
     "TRANSITION",
+    "UNCLEAR",
     "DATA_INVALID",
 ]
 
@@ -193,13 +195,20 @@ def calculate_m30_structure(candles: Sequence[Candle]) -> M30StructureResult:
     swing_highs, swing_lows = _confirmed_swings(lookback)
     atr = _atr_sma(lookback)
 
-    if len(swing_highs) < 2 or len(swing_lows) < 2:
-        return _invalid_result(
-            "At least two confirmed swing highs and two confirmed swing lows are required."
-        )
-
     if atr is None:
         return _invalid_result("At least 15 candles are required to calculate ATR(14).")
+
+    # Valid data without two swings per side is an unreadable market, not bad data.
+    if len(swing_highs) < 2 or len(swing_lows) < 2:
+        return {
+            "status": "UNCLEAR",
+            "last_swing_high": swing_highs[0] if swing_highs else None,
+            "prev_swing_high": None,
+            "last_swing_low": swing_lows[0] if swing_lows else None,
+            "prev_swing_low": None,
+            "atr": atr,
+            "reason": "Fewer than two confirmed swing highs or swing lows in the lookback.",
+        }
 
     last_swing_high, prev_swing_high = swing_highs[0], swing_highs[1]
     last_swing_low, prev_swing_low = swing_lows[0], swing_lows[1]
