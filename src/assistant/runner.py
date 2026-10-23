@@ -5,11 +5,10 @@ read only closed candles from MT5, run H1/M30/M15/M5 analysis, run the active
 News filter, combine those results through assistant.planner.build_suggestion,
 then print the Telegram-ready summary.
 
-Geopolitics and Macro are intentionally inactive in v1.0 and are not called
-from this evaluation chain. The runner uses UTC internally, never places or
-modifies orders, and returns DATA_INVALID when required broker data or
-configuration cannot be obtained. Credentials are loaded from .env and broker
-settings from config/broker.toml; no credentials are hardcoded.
+The runner uses UTC internally, never places or modifies orders, and returns
+DATA_INVALID when required broker data or configuration cannot be obtained.
+Credentials are loaded from .env and broker settings from config/broker.toml;
+no credentials are hardcoded.
 """
 
 from __future__ import annotations
@@ -85,15 +84,12 @@ def _invalid_result(reason: str) -> PlannerResult:
 
     invalid_analysis = {"status": "DATA_INVALID", "reason": reason}
     unknown_filter = {"status": "NEWS_UNKNOWN", "reason": reason}
-    inactive_filter = _inactive_filter_result()
     return build_suggestion(
         h1=invalid_analysis,
         m30=invalid_analysis,
         m15=invalid_analysis,
         m5=invalid_analysis,
         news=unknown_filter,
-        geopolitics=inactive_filter,
-        macro=inactive_filter,
     )
 
 
@@ -101,7 +97,7 @@ def _analyse_and_filter(
     candles: dict[Timeframe, list],
     now_utc: datetime,
 ) -> PlannerResult:
-    """Run all analysis and filter modules, then pass their results to planner."""
+    """Run active analysis and News filtering, then pass results to planner."""
 
     # Analysis is kept separate from broker reads so each module remains pure.
     h1 = calculate_h1_sr(candles[Timeframe.H1])
@@ -120,11 +116,8 @@ def _analyse_and_filter(
         m30_prev_swing_low=m30["prev_swing_low"],
     )
 
-    # News is the only currently implemented external calendar filter.
+    # News is the only active external filter in v1.0.
     news = check_news_filter(now_utc, DEFAULT_CALENDAR_PATH)
-
-    # Geopolitics and Macro remain inactive snapshots in v1.0.
-    inactive_filter = _inactive_filter_result()
 
     # The planner applies the active gate order and returns the final result.
     return build_suggestion(
@@ -133,8 +126,6 @@ def _analyse_and_filter(
         m15=m15,
         m5=m5,
         news=news,
-        geopolitics=inactive_filter,
-        macro=inactive_filter,
     )
 
 
