@@ -317,7 +317,7 @@ def _build_valid_plan(
     entry_zone: EntryZone,
     structure_level: float,
     atr: float,
-) -> tuple[float, float, float, float, float, float, str] | None:
+) -> tuple[float, float, float, float, float, float, float] | None:
     """Build SL, risk, and TP values when structural risk passes the ATR filter."""
 
     entry = (entry_zone["low"] + entry_zone["high"]) / 2.0
