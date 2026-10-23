@@ -294,20 +294,24 @@ def _level_near_anchor(
 
 def _structural_stop_level(
     direction: Direction,
-    entry: float,
+    entry_zone: EntryZone,
     h1_levels: Sequence[float],
     m5_swing: float | None,
 ) -> float | None:
-    """Select the closest valid structural level on the protective side."""
+    """Select the closest structural level beyond the Entry Zone.
+
+    The level the Entry Zone is built around cannot protect the trade, so only
+    levels strictly outside the zone on the protective side qualify.
+    """
 
     candidates = list(h1_levels)
     if m5_swing is not None:
         candidates.append(m5_swing)
     if direction == "BULLISH":
-        valid_levels = [level for level in candidates if level <= entry]
+        valid_levels = [level for level in candidates if level < entry_zone["low"]]
         return max(valid_levels) if valid_levels else None
 
-    valid_levels = [level for level in candidates if level >= entry]
+    valid_levels = [level for level in candidates if level > entry_zone["high"]]
     return min(valid_levels) if valid_levels else None
 
 
@@ -478,7 +482,6 @@ def calculate_m5_rejection(
             location_valid=True,
         )
 
-    entry = (entry_zone["low"] + entry_zone["high"]) / 2.0
     m5_swing = _confirmed_m5_swing(candles, direction)
     h1_entry_levels = (
         _finite_levels(h1_supports)
@@ -487,7 +490,7 @@ def calculate_m5_rejection(
     )
     structure_level = _structural_stop_level(
         direction=direction,
-        entry=entry,
+        entry_zone=entry_zone,
         h1_levels=h1_entry_levels,
         m5_swing=m5_swing,
     )
