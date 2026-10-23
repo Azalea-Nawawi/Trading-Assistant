@@ -293,7 +293,6 @@ def _level_near_anchor(
 def _structural_stop_level(
     direction: Direction,
     entry: float,
-    entry_level: float,
     h1_levels: Sequence[float],
     m5_swing: float | None,
 ) -> float | None:
@@ -302,8 +301,6 @@ def _structural_stop_level(
     candidates = list(h1_levels)
     if m5_swing is not None:
         candidates.append(m5_swing)
-    candidates.append(entry_level)
-
     if direction == "BULLISH":
         valid_levels = [level for level in candidates if level <= entry]
         return max(valid_levels) if valid_levels else None
@@ -489,7 +486,6 @@ def calculate_m5_rejection(
     structure_level = _structural_stop_level(
         direction=direction,
         entry=entry,
-        entry_level=entry_level,
         h1_levels=h1_entry_levels,
         m5_swing=m5_swing,
     )
