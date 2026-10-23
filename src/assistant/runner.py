@@ -123,7 +123,7 @@ def _analyse_and_filter(
     """Run all analysis and filter modules, then pass their results to planner."""
 
     # Analysis is kept separate from broker reads so each module remains pure.
-    h1 = calculate_h1_sr(candles[Timeframe.H1])
+    h1 = calculate_h1_sr(candles[Timeframe.H1], current_price=current_price)
     m30 = calculate_m30_structure(candles[Timeframe.M30])
     m15 = calculate_m15_bias(candles[Timeframe.M15])
 

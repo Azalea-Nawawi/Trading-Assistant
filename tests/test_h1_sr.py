@@ -24,3 +24,11 @@ def test_levels_within_1_50_merge_before_nearest_selection():
     )
     result = calculate_h1_sr(candles)
     assert result["resistances"] == [2005.5, 2020.0, 2030.0]
+
+
+def test_live_price_is_used_instead_of_last_h1_close():
+    # Last H1 close is 2000.0; the live price has already moved to 2003.0.
+    candles = flat_series(60, Timeframe.H1, highs={20: 2005.0}, lows={30: 1995.0})
+    result = calculate_h1_sr(candles, current_price=2003.0)
+    assert result["distance_to_resistance"] == 2.0
+    assert result["distance_to_support"] == 8.0

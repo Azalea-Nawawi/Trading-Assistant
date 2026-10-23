@@ -6,7 +6,8 @@ confirmation) in a 60-candle lookback, merge levels within USD 1.50 into zones
 priced at their mean, then keep the three zones nearest to price on each side.
 
 All input candles must already be closed and ordered from oldest to newest.
-The latest candle close is used as the current price. Swing candidates are
+Zones are split around the live market price when it is supplied; the latest
+H1 close is only a fallback, since it can be up to one hour old. Swing candidates are
 limited to candles with two candles on both sides, so a swing is never used
 before its two right-hand candles have closed (anti look-ahead).
 """
@@ -133,12 +134,17 @@ def _nearest_zones(
     return supports[-MAX_ZONES_PER_SIDE:], resistances[:MAX_ZONES_PER_SIDE]
 
 
-def calculate_h1_sr(candles: Sequence[Candle]) -> H1SRResult:
+def calculate_h1_sr(
+    candles: Sequence[Candle],
+    current_price: float | None = None,
+) -> H1SRResult:
     """Calculate H1 support and resistance from confirmed swing levels.
 
     Args:
         candles: At least 60 closed H1 Candle objects, ordered from oldest to
-            newest. The close of the newest candle is treated as current price.
+            newest.
+        current_price: Live market price used to split and rank zones.
+            Defaults to the close of the newest candle.
 
     Returns:
         A mapping containing up to three ascending support zones, up to three
@@ -153,7 +159,8 @@ def calculate_h1_sr(candles: Sequence[Candle]) -> H1SRResult:
     if not _has_valid_input(candles):
         return _invalid_result()
 
-    current_price = candles[-1].close
+    if current_price is None:
+        current_price = candles[-1].close
     swing_highs, swing_lows = _confirmed_swings(candles)
     supports, resistances = _nearest_zones(
         swing_highs=swing_highs,

@@ -23,7 +23,12 @@ def test_analysis_cycle_reaches_valid_with_only_news_filter(monkeypatch):
         "last_swing_low": None,
         "prev_swing_low": None,
     }
-    monkeypatch.setattr(runner, "calculate_h1_sr", lambda candles: H1)
+    h1_prices = []
+    monkeypatch.setattr(
+        runner,
+        "calculate_h1_sr",
+        lambda candles, current_price: h1_prices.append(current_price) or H1,
+    )
     monkeypatch.setattr(runner, "calculate_m30_structure", lambda candles: m30)
     monkeypatch.setattr(runner, "calculate_m15_bias", lambda candles: M15_BULL)
     monkeypatch.setattr(runner, "calculate_m5_rejection", lambda candles, **kw: m5_valid())
@@ -35,6 +40,8 @@ def test_analysis_cycle_reaches_valid_with_only_news_filter(monkeypatch):
     assert runner._analyse_and_filter(candles, now, 2000.0)["status"] == "VALID"
     # The live price is passed through to the Entry Zone expiry check (DEC-006).
     assert runner._analyse_and_filter(candles, now, 2010.0)["status"] == "STANDBY"
+    # H1 zones are split around the live price, not the last H1 close (BUG-011).
+    assert h1_prices == [2000.0, 2010.0]
 
 
 # --- Step 1 data validation: stale candles (DEC-009) ---------------------------------
