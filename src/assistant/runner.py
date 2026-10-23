@@ -43,8 +43,6 @@ CANDLE_COUNTS: Final[dict[Timeframe, int]] = {
     Timeframe.M15: 60,
     Timeframe.M5: 15,
 }
-INACTIVE_FILTER_STATUS: Final[str] = "INACTIVE"
-INACTIVE_FILTER_REASON: Final[str] = "Disabled in Spesifikasi Final v1.0."
 
 log = logging.getLogger(__name__)
 
@@ -67,15 +65,6 @@ def _collect_candles(broker: MT5Broker) -> dict[Timeframe, list[Candle]]:
     return {
         timeframe: broker.candles(timeframe, count)
         for timeframe, count in CANDLE_COUNTS.items()
-    }
-
-
-def _inactive_filter_result() -> dict[str, str]:
-    """Return the non-evaluated filter snapshot used by v1.0."""
-
-    return {
-        "status": INACTIVE_FILTER_STATUS,
-        "reason": INACTIVE_FILTER_REASON,
     }
 
 
