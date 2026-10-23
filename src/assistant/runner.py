@@ -1,22 +1,20 @@
 """Semi-auto analysis cycle entry point.
 
-This module implements the runner flow from Spesifikasi Final v1.0:
-read only closed candles from MT5, run H1/M30/M15/M5 analysis, run News,
-Geopolitics, and Macro filters, combine the results through
-assistant.planner.build_suggestion, then print the Telegram-ready summary.
+This module implements the active runner flow from Spesifikasi Final v1.0:
+read only closed candles from MT5, run H1/M30/M15/M5 analysis, run the active
+News filter, combine those results through assistant.planner.build_suggestion,
+then print the Telegram-ready summary.
 
-The runner uses UTC internally, never places or modifies orders, and returns
-DATA_INVALID when required broker data or configuration cannot be obtained.
-Credentials are loaded from .env and broker settings from config/broker.toml;
-no credentials are hardcoded. The Macro filter is currently a fail-closed
-placeholder, and the Geopolitics filter receives no network headlines until a
-separate source is provided.
+Geopolitics and Macro are intentionally inactive in v1.0 and are not called
+from this evaluation chain. The runner uses UTC internally, never places or
+modifies orders, and returns DATA_INVALID when required broker data or
+configuration cannot be obtained. Credentials are loaded from .env and broker
+settings from config/broker.toml; no credentials are hardcoded.
 """
 
 from __future__ import annotations
 
 import logging
-from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Final
@@ -33,8 +31,6 @@ from src.broker import (
     load_mt5_module,
     parse_env_text,
 )
-from src.filters.geopolitics import check_geopolitical_risk
-from src.filters.macro import check_macro_filter
 from src.filters.news import DEFAULT_CALENDAR_PATH, check_news_filter
 from src.models import Candle, Timeframe
 
@@ -48,6 +44,8 @@ CANDLE_COUNTS: Final[dict[Timeframe, int]] = {
     Timeframe.M15: 60,
     Timeframe.M5: 15,
 }
+INACTIVE_FILTER_STATUS: Final[str] = "INACTIVE"
+INACTIVE_FILTER_REASON: Final[str] = "Disabled in Spesifikasi Final v1.0."
 
 log = logging.getLogger(__name__)
 
@@ -55,9 +53,8 @@ log = logging.getLogger(__name__)
 def _load_broker(symbol: str) -> MT5Broker:
     """Load non-secret config and credentials, then construct the read-only broker."""
 
-    config = load_broker_config(DEFAULT_CONFIG_PATH)
-    if config.symbol != symbol:
-        config = replace(config, symbol=symbol)
+    config = load_broker_config(DEFAULT_CONFIG_PATH, symbol=symbol)
+    log.info("runner: using requested broker symbol=%s", config.symbol)
 
     env_values = parse_env_text(DEFAULT_ENV_PATH.read_text(encoding="utf-8"))
     credentials = credentials_from_env(env_values)
@@ -74,21 +71,29 @@ def _collect_candles(broker: MT5Broker) -> dict[Timeframe, list[Candle]]:
     }
 
 
+def _inactive_filter_result() -> dict[str, str]:
+    """Return the non-evaluated filter snapshot used by v1.0."""
+
+    return {
+        "status": INACTIVE_FILTER_STATUS,
+        "reason": INACTIVE_FILTER_REASON,
+    }
+
+
 def _invalid_result(reason: str) -> PlannerResult:
     """Create a planner-compatible failure result without fabricating analysis."""
 
     invalid_analysis = {"status": "DATA_INVALID", "reason": reason}
     unknown_filter = {"status": "NEWS_UNKNOWN", "reason": reason}
-    geopolitics = {"status": "GEO_UNKNOWN", "reason": reason}
-    macro = {"status": "MACRO_UNKNOWN", "reason": reason}
+    inactive_filter = _inactive_filter_result()
     return build_suggestion(
         h1=invalid_analysis,
         m30=invalid_analysis,
         m15=invalid_analysis,
         m5=invalid_analysis,
         news=unknown_filter,
-        geopolitics=geopolitics,
-        macro=macro,
+        geopolitics=inactive_filter,
+        macro=inactive_filter,
     )
 
 
@@ -118,19 +123,18 @@ def _analyse_and_filter(
     # News is the only currently implemented external calendar filter.
     news = check_news_filter(now_utc, DEFAULT_CALENDAR_PATH)
 
-    # No network scraping is performed here; absent headlines fail closed.
-    geopolitics = check_geopolitical_risk(None)
-    macro = check_macro_filter()
+    # Geopolitics and Macro remain inactive snapshots in v1.0.
+    inactive_filter = _inactive_filter_result()
 
-    # The planner applies the mandatory gate order and returns the final result.
+    # The planner applies the active gate order and returns the final result.
     return build_suggestion(
         h1=h1,
         m30=m30,
         m15=m15,
         m5=m5,
         news=news,
-        geopolitics=geopolitics,
-        macro=macro,
+        geopolitics=inactive_filter,
+        macro=inactive_filter,
     )
 
 
