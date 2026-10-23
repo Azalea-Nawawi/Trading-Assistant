@@ -7,11 +7,11 @@ from src.models import Candle, Timeframe
 START = datetime(2026, 10, 23, 8, 0, tzinfo=timezone.utc)
 
 
-def candle(index, open_, high, low, close, timeframe=Timeframe.M5):
+def candle(index, open_, high, low, close, timeframe=Timeframe.M5, start=START):
     return Candle(
         symbol="XAUUSDm",
         timeframe=timeframe,
-        open_time=START + timedelta(seconds=timeframe.seconds * index),
+        open_time=start + timedelta(seconds=timeframe.seconds * index),
         open=open_,
         high=high,
         low=low,
@@ -19,7 +19,9 @@ def candle(index, open_, high, low, close, timeframe=Timeframe.M5):
     )
 
 
-def flat_series(count, timeframe, price=2000.0, half_range=0.5, lows=None, highs=None):
+def flat_series(
+    count, timeframe, price=2000.0, half_range=0.5, lows=None, highs=None, start_shift=timedelta(0)
+):
     """Flat candles around ``price``; ``lows``/``highs`` map index -> spike level."""
 
     lows, highs = lows or {}, highs or {}
@@ -31,6 +33,7 @@ def flat_series(count, timeframe, price=2000.0, half_range=0.5, lows=None, highs
             lows.get(index, price - half_range),
             price,
             timeframe,
+            START + start_shift,
         )
         for index in range(count)
     ]

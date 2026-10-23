@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 import math
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -198,13 +198,22 @@ class MT5Broker:
         )
 
     def candles(self, timeframe: Timeframe, count: int) -> list[Candle]:
-        """The last ``count`` CLOSED candles, oldest first; position 0 (forming) is dropped."""
+        """Up to the last ``count`` CLOSED candles, oldest first.
+
+        DEC-009: a row is closed only when its open time plus the timeframe
+        length is at or before the latest server tick time; position 0 is not
+        assumed to be forming (or closed) by position alone.
+        """
         self._require_connected()
         if not isinstance(count, int) or isinstance(count, bool) or count < 1:
             raise BrokerError("count must be an int >= 1")
         constant = getattr(self._mt5, f"TIMEFRAME_{timeframe.value}")
         rates = self._call("copy_rates_from_pos", self._config.symbol, constant, 0, count + 1)
-        rows = list(rates)[:-1]  # oldest first; the last row is position 0
+        server_now = self.tick().time
+        length = timedelta(seconds=timeframe.seconds)
+        rows = [
+            row for row in list(rates) if self._utc(int(row["time"])) + length <= server_now
+        ][-count:]
         return self._map(
             "candle",
             lambda: [

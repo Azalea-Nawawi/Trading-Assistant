@@ -357,6 +357,25 @@ def test_candles_drop_position_zero():
     assert first.timeframe is Timeframe.M5
 
 
+def test_candles_keep_last_row_when_it_has_closed_by_server_time():
+    # DEC-009: closure is decided by timestamp, not by position. Market idle after
+    # 11:05 server time, so the 11:00 bar is already closed and must be kept.
+    broker, fake = make_broker()
+    fake.tick.time_msc = wall_epoch("2026-10-20T11:07") * 1000
+    candles = broker.candles(Timeframe.M5, 2)
+    assert [c.open_time for c in candles] == [
+        datetime(2026, 10, 20, 10, 55, tzinfo=timezone.utc),
+        datetime(2026, 10, 20, 11, 0, tzinfo=timezone.utc),
+    ]
+
+
+def test_candles_drop_every_row_not_closed_at_server_time():
+    broker, fake = make_broker()
+    fake.tick.time_msc = wall_epoch("2026-10-20T10:58") * 1000  # 10:55 bar still forming
+    candles = broker.candles(Timeframe.M5, 2)
+    assert [c.open_time for c in candles] == [datetime(2026, 10, 20, 10, 50, tzinfo=timezone.utc)]
+
+
 def test_margin_per_lot_uses_side_price():
     broker, fake = make_broker()
     assert broker.margin_per_lot(Direction.BUY) == 41.0

@@ -1,10 +1,12 @@
 """Runner evaluation chain (DEC-002: geopolitics and macro are not in v1.0)."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 from src.assistant import runner
 from src.models import Timeframe
 
+from tests._candles import flat_series
 from tests.test_planner import H1, M15_BULL, M30_UP, NEWS_CLEAR, m5_valid
 
 
@@ -33,3 +35,57 @@ def test_analysis_cycle_reaches_valid_with_only_news_filter(monkeypatch):
     assert runner._analyse_and_filter(candles, now, 2000.0)["status"] == "VALID"
     # The live price is passed through to the Entry Zone expiry check (DEC-006).
     assert runner._analyse_and_filter(candles, now, 2010.0)["status"] == "STANDBY"
+
+
+# --- Step 1 data validation: stale candles (DEC-009) ---------------------------------
+
+def fresh_candles(now):
+    """Per timeframe, a series whose newest candle closed within the last slot."""
+
+    result = {}
+    for timeframe in (Timeframe.H1, Timeframe.M30, Timeframe.M15, Timeframe.M5):
+        series = flat_series(3, timeframe)
+        shift = now - (series[-1].open_time + timedelta(seconds=timeframe.seconds))
+        result[timeframe] = flat_series(3, timeframe, start_shift=shift)
+    return result
+
+
+def test_fresh_candles_pass_staleness_check():
+    now = datetime(2026, 10, 23, 10, 3, tzinfo=timezone.utc)
+    assert runner._stale_data_reason(fresh_candles(now), now) is None
+
+
+def test_stale_candles_are_reported():
+    now = datetime(2026, 10, 23, 10, 3, tzinfo=timezone.utc)
+    candles = fresh_candles(now - timedelta(hours=60))  # e.g. weekend, feed frozen
+    reason = runner._stale_data_reason(candles, now)
+    assert reason is not None and "stale" in reason
+
+
+def test_missing_candles_are_reported():
+    now = datetime(2026, 10, 23, 10, 3, tzinfo=timezone.utc)
+    candles = fresh_candles(now)
+    candles[Timeframe.M5] = []
+    assert runner._stale_data_reason(candles, now) is not None
+
+
+def test_run_once_returns_data_invalid_on_stale_candles(monkeypatch):
+    stale = fresh_candles(datetime(2026, 10, 1, tzinfo=timezone.utc))
+
+    class StaleBroker:
+        def connect(self):
+            pass
+
+        def disconnect(self):
+            pass
+
+        def candles(self, timeframe, count):
+            return stale[timeframe]
+
+        def tick(self):
+            return SimpleNamespace(bid=2000.0)
+
+    monkeypatch.setattr(runner, "_load_broker", lambda symbol: StaleBroker())
+    result = runner.run_once("XAUUSDm", emit=False)
+    assert result["status"] == "DATA_INVALID"
+    assert "stale" in result["reason"]

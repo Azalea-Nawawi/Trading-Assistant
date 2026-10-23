@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Final
 
@@ -49,6 +49,10 @@ CANDLE_COUNTS: Final[dict[Timeframe, int]] = {
 log = logging.getLogger(__name__)
 
 
+class _StaleDataError(Exception):
+    """Broker data is readable but too old to analyse (DATA_INVALID)."""
+
+
 def _load_broker(symbol: str) -> MT5Broker:
     """Load non-secret config and credentials, then construct the read-only broker."""
 
@@ -69,6 +73,31 @@ def _collect_candles(broker: MT5Broker) -> dict[Timeframe, list[Candle]]:
         timeframe: broker.candles(timeframe, count)
         for timeframe, count in CANDLE_COUNTS.items()
     }
+
+
+def _stale_data_reason(
+    candles: dict[Timeframe, list[Candle]],
+    now_utc: datetime,
+) -> str | None:
+    """Return why the candle data is stale, or None when every timeframe is fresh.
+
+    The newest closed candle of each timeframe must be the one that closed
+    within the last timeframe slot; otherwise the feed is frozen, the market is
+    closed, or bars are missing (DEC-009, evaluation step 1).
+    """
+
+    for timeframe in CANDLE_COUNTS:
+        series = candles.get(timeframe) or []
+        if not series:
+            return f"No closed {timeframe.value} candles were returned."
+        length = timedelta(seconds=timeframe.seconds)
+        newest_close = series[-1].open_time + length
+        if newest_close < now_utc - length:
+            return (
+                f"{timeframe.value} data is stale: newest candle closed at "
+                f"{newest_close.isoformat()}."
+            )
+    return None
 
 
 def _invalid_result(reason: str) -> PlannerResult:
@@ -170,11 +199,17 @@ def run_once(
         broker = _load_broker(symbol)
         broker.connect()
         candles = _collect_candles(broker)
+        stale_reason = _stale_data_reason(candles, now_utc)
+        if stale_reason is not None:
+            raise _StaleDataError(stale_reason)
         # Bid matches the candle price basis; used for Entry Zone expiry (DEC-006).
         current_price = broker.tick().bid
 
         # Run analysis, filters, and the final planner in one deterministic cycle.
         result = _analyse_and_filter(candles, now_utc, current_price)
+    except _StaleDataError as error:
+        log.warning("runner: %s", error)
+        result = _invalid_result(str(error))
     except Exception as error:
         log.exception("runner: analysis cycle failed: %s", error)
         result = _invalid_result(

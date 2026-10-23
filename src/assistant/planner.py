@@ -86,7 +86,9 @@ def _validate_result(
         return f"{name} result does not contain a valid status."
 
     if status == "DATA_INVALID":
-        return f"{name} reported DATA_INVALID."
+        detail = value.get("reason")
+        suffix = f": {detail}" if isinstance(detail, str) and detail else "."
+        return f"{name} reported DATA_INVALID{suffix}"
 
     if allowed_statuses is not None and status not in allowed_statuses:
         return f"{name} has unsupported status '{status}'."
