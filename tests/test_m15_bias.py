@@ -30,3 +30,26 @@ def test_price_back_below_ema21_in_uptrend_is_neutral():
     result = calculate_m15_bias(series(closes))
     assert result["ema50"] < result["close"] < result["ema21"]
     assert result["status"] == "NEUTRAL"
+
+
+def random_walk(count, seed=7):
+    import random
+
+    rng = random.Random(seed)
+    closes, price = [], 2000.0
+    for _ in range(count):
+        price += rng.uniform(-3.0, 3.0)
+        closes.append(price)
+    return closes
+
+
+def test_ema50_on_minimum_window_matches_long_history():
+    # BUG-015: an SMA-seeded EMA50 needs enough candles to converge to the
+    # value a long MT5 history would give.
+    from src.analysis.m15_bias import MIN_CANDLES
+
+    long_history = series(random_walk(1000))
+    full = calculate_m15_bias(long_history)
+    window = calculate_m15_bias(long_history[-MIN_CANDLES:])
+    assert abs(window["ema50"] - full["ema50"]) < 0.01
+    assert abs(window["ema21"] - full["ema21"]) < 0.01

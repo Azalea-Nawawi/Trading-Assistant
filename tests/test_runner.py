@@ -102,3 +102,9 @@ def test_run_once_returns_data_invalid_on_stale_candles(monkeypatch):
     result = runner.run_once("XAUUSDm", emit=False)
     assert result["status"] == "DATA_INVALID"
     assert "stale" in result["reason"]
+
+
+def test_runner_fetches_enough_m15_candles_for_converged_ema():
+    from src.analysis.m15_bias import MIN_CANDLES
+
+    assert runner.CANDLE_COUNTS[Timeframe.M15] >= MIN_CANDLES

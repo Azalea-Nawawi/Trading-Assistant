@@ -21,7 +21,9 @@ from src.models import Candle, Timeframe
 
 EMA_FAST_PERIOD: Final[int] = 21
 EMA_SLOW_PERIOD: Final[int] = 50
-MIN_CANDLES: Final[int] = 60
+# An SMA-seeded EMA50 keeps (1 - 2/51)^n of its seed error; 200 updates after
+# the seed bring it in line with a long MT5 history (BUG-015).
+MIN_CANDLES: Final[int] = 250
 
 BiasStatus = Literal["BULLISH", "BEARISH", "NEUTRAL", "DATA_INVALID"]
 
@@ -86,7 +88,7 @@ def calculate_m15_bias(candles: Sequence[Candle]) -> M15BiasResult:
     """Determine short-term M15 directional bias from EMA(21) and EMA(50).
 
     Args:
-        candles: At least 60 closed M15 Candle objects ordered from oldest to
+        candles: At least 250 closed M15 Candle objects ordered from oldest to
             newest. The latest candle close is used as the evaluated close.
 
     Returns:
@@ -100,7 +102,7 @@ def calculate_m15_bias(candles: Sequence[Candle]) -> M15BiasResult:
 
     if not _has_valid_input(candles):
         return _invalid_result(
-            "At least 60 chronological closed M15 candles are required."
+            f"At least {MIN_CANDLES} chronological closed M15 candles are required."
         )
 
     closes = [candle.close for candle in candles]
